@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>AsthmeTrack</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #0d0f14;
+    --surface: #161920;
+    --surface2: #1e222d;
+    --border: #2a2f3d;
+    --text: #e8eaf0;
+    --muted: #6b7280;
+    --accent: #4f9cf9;
+    --accent2: #7c3aed;
+    --green: #10d9a0;
+    --yellow: #f5a623;
+    --red: #f04f4f;
+    --green-dim: rgba(16,217,160,0.12);
+    --yellow-dim: rgba(245,166,35,0.12);
+    --red-dim: rgba(240,79,79,0.12);
+    --radius: 14px;
+    --font-head: 'Syne', sans-serif;
+    --font-mono: 'DM Mono', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font-mono); font-size: 14px; min-height: 100vh; overflow-x: hidden; }
+
+  .app-header { position: sticky; top: 0; z-index: 100; background: rgba(13,15,20,0.92); backdrop-filter: blur(16px); border-bottom: 1px solid var(--border); padding: 16px 20px 12px; display: flex; align-items: center; justify-content: space-between; }
+  .app-header h1 { font-family: var(--font-head); font-size: 20px; font-weight: 800; letter-spacing: -0.5px; background: linear-gradient(135deg, var(--accent), var(--green)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .header-right { display: flex; align-items: center; gap: 8px; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite; }
+  .status-dot.syncing { background: var(--yellow); box-shadow: 0 0 8px var(--yellow); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  .nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 100; background: rgba(13,15,20,0.95); backdrop-filter: blur(20px); border-top: 1px solid var(--border); display: flex; padding-bottom: env(safe-area-inset-bottom, 0); }
+  .nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 10px 4px; background: none; border: none; color: var(--muted); cursor: pointer; transition: color .2s; font-family: var(--font-mono); font-size: 10px; }
+  .nav-btn svg { width: 22px; height: 22px; stroke-width: 1.5; }
+  .nav-btn.active { color: var(--accent); }
+  .nav-btn.active svg { filter: drop-shadow(0 0 4px var(--accent)); }
+
+  .page { display: none; padding: 20px 16px 100px; animation: fadeIn .25s ease; }
+  .page.active { display: block; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; margin-bottom: 14px; }
+  .card-title { font-family: var(--font-head); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); margin-bottom: 14px; }
+
+  .zone-green { color: var(--green); background: var(--green-dim); }
+  .zone-yellow { color: var(--yellow); background: var(--yellow-dim); }
+  .zone-red { color: var(--red); background: var(--red-dim); }
+  .zone-badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+
+  .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .metric-box { background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 14px 12px; position: relative; overflow: hidden; }
+  .metric-box::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+  .metric-box.green::before { background: var(--green); }
+  .metric-box.yellow::before { background: var(--yellow); }
+  .metric-box.red::before { background: var(--red); }
+  .metric-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+  .metric-value { font-family: var(--font-head); font-size: 28px; font-weight: 800; line-height: 1; }
+  .metric-unit { font-family: var(--font-mono); font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .metric-pct { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .dep-measurements { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  .chart-wrap { position: relative; height: 120px; margin-top: 8px; }
+  canvas { width: 100% !important; }
+
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+  .field input, .field textarea { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-family: var(--font-mono); font-size: 15px; padding: 12px 14px; outline: none; transition: border-color .2s; }
+  .field input:focus, .field textarea:focus { border-color: var(--accent); }
+  .field textarea { resize: vertical; min-height: 80px; }
+
+  .dep-inputs { display: flex; gap: 8px; }
+  .dep-field { flex: 1; }
+  .dep-field label { font-size: 10px; color: var(--muted); display: block; margin-bottom: 4px; text-align: center; }
+  .dep-field input { width: 100%; text-align: center; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-family: var(--font-head); font-size: 18px; font-weight: 700; padding: 12px 6px; outline: none; transition: border-color .2s; }
+  .dep-field input:focus { border-color: var(--accent); }
+  .dep-avg-display { background: rgba(79,156,249,.08); border: 1px solid rgba(79,156,249,.3); border-radius: 10px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+  .dep-avg-label { font-size: 11px; color: var(--muted); }
+  .dep-avg-value { font-family: var(--font-head); font-size: 20px; font-weight: 800; color: var(--accent); }
+
+  .easyhaler-btns { display: flex; gap: 6px; }
+  .easyh-btn { flex: 1; padding: 14px 4px; background: var(--surface2); border: 2px solid var(--border); border-radius: 10px; color: var(--muted); font-family: var(--font-head); font-size: 18px; font-weight: 700; cursor: pointer; transition: all .15s; text-align: center; }
+  .easyh-btn.selected { border-color: var(--accent); color: var(--accent); background: rgba(79,156,249,.12); box-shadow: 0 0 12px rgba(79,156,249,.2); }
+
+  .btn-primary { width: 100%; padding: 16px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border: none; border-radius: 12px; color: #fff; font-family: var(--font-head); font-size: 15px; font-weight: 700; cursor: pointer; letter-spacing: .5px; transition: opacity .2s, transform .1s; }
+  .btn-primary:active { opacity: .85; transform: scale(.98); }
+  .btn-secondary { padding: 10px 16px; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-family: var(--font-mono); font-size: 13px; cursor: pointer; transition: border-color .2s; }
+  .btn-secondary:hover { border-color: var(--accent); }
+
+  /* Google Sign-In button — style officiel Google */
+  .btn-google {
+    width: 100%; padding: 14px 20px;
+    background: #fff; border: 1px solid #dadce0;
+    border-radius: 12px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 12px;
+    font-family: 'Roboto', var(--font-mono); font-size: 15px; font-weight: 500;
+    color: #3c4043; transition: background .15s, box-shadow .15s;
+    box-shadow: 0 1px 3px rgba(0,0,0,.15);
+  }
+  .btn-google:hover { background: #f8f9fa; box-shadow: 0 2px 6px rgba(0,0,0,.2); }
+  .btn-google:active { background: #f1f3f4; }
+  .btn-google svg { width: 20px; height: 20px; flex-shrink: 0; }
+
+  .history-item { background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 10px; display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .history-date { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+  .history-vals { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .history-chip { font-size: 12px; padding: 3px 9px; border-radius: 20px; background: var(--surface); border: 1px solid var(--border); }
+  .history-comment { font-size: 12px; color: var(--muted); margin-top: 6px; font-style: italic; }
+  .history-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .icon-action-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 15px; padding: 2px; transition: color .2s; }
+  .icon-action-btn.edit:hover { color: var(--accent); }
+  .icon-action-btn.del:hover { color: var(--red); }
+
+  .setting-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .setting-row:last-child { border-bottom: none; }
+  .setting-label { font-size: 13px; color: var(--text); }
+  .setting-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .toggle { position: relative; width: 46px; height: 26px; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider { position: absolute; inset: 0; background: var(--border); border-radius: 26px; cursor: pointer; transition: background .2s; }
+  .toggle-slider::before { content: ''; position: absolute; left: 3px; top: 3px; width: 20px; height: 20px; background: #fff; border-radius: 50%; transition: transform .2s; }
+  .toggle input:checked + .toggle-slider { background: var(--accent); }
+  .toggle input:checked + .toggle-slider::before { transform: translateX(20px); }
+
+  .reminder-item { display: flex; align-items: center; justify-content: space-between; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; gap: 10px; }
+  .reminder-info { flex: 1; }
+  .reminder-time { font-family: var(--font-head); font-size: 16px; font-weight: 700; color: var(--accent); }
+  .reminder-label-text { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .reminder-del { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 16px; }
+  .add-reminder-form { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .add-reminder-form input { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-family: var(--font-mono); font-size: 13px; padding: 10px 12px; outline: none; transition: border-color .2s; }
+  .add-reminder-form input:focus { border-color: var(--accent); }
+  .add-reminder-form input[type=time] { width: 110px; }
+  .add-reminder-form input[type=text] { flex: 1; min-width: 120px; }
+
+  /* Drive card */
+  .drive-connected { display: flex; align-items: center; gap: 12px; background: var(--surface2); border: 1px solid rgba(16,217,160,.3); border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+  .drive-avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--green-dim); display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+  .drive-info { flex: 1; }
+  .drive-name { font-size: 13px; font-weight: 500; color: var(--text); }
+  .drive-sub { font-size: 11px; color: var(--green); margin-top: 2px; }
+  .drive-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  .drive-btn { flex: 1; padding: 11px 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-family: var(--font-mono); font-size: 12px; cursor: pointer; transition: all .2s; text-align: center; }
+  .drive-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .drive-btn.upload { border-color: rgba(79,156,249,.4); color: var(--accent); background: rgba(79,156,249,.08); }
+  .drive-btn.download { border-color: rgba(16,217,160,.4); color: var(--green); background: rgba(16,217,160,.08); }
+  .drive-btn.danger { color: var(--red); }
+  .drive-btn.danger:hover { border-color: var(--red); }
+
+  .modal-overlay { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,.7); backdrop-filter: blur(8px); display: flex; align-items: flex-end; justify-content: center; opacity: 0; pointer-events: none; transition: opacity .25s; }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 20px 20px 0 0; padding: 24px 20px 40px; width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto; transform: translateY(40px); transition: transform .25s; }
+  .modal-overlay.open .modal { transform: translateY(0); }
+  .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .modal-title { font-family: var(--font-head); font-size: 16px; font-weight: 700; }
+  .modal-close { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--muted); width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+
+  .toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); background: var(--green); color: #000; padding: 10px 20px; border-radius: 30px; font-family: var(--font-head); font-size: 13px; font-weight: 700; z-index: 999; opacity: 0; transition: opacity .3s; pointer-events: none; white-space: nowrap; }
+  .toast.show { opacity: 1; }
+  .toast.error { background: var(--red); color: #fff; }
+
+  .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .icon-btn { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: border-color .2s; }
+  .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .icon-btn svg { width: 16px; height: 16px; }
+
+  .empty-state { text-align: center; color: var(--muted); padding: 40px 20px; }
+  .empty-state svg { width: 48px; height: 48px; margin-bottom: 12px; opacity: .3; }
+  .empty-state p { font-size: 13px; }
+
+  .reminder-badge { font-size: 11px; padding: 4px 10px; background: rgba(79,156,249,.1); border: 1px solid rgba(79,156,249,.3); border-radius: 20px; color: var(--accent); margin-right: 6px; margin-bottom: 6px; display: inline-block; }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <h1>AsthmeTrack</h1>
+  <div class="header-right">
+    <div id="syncIndicator" style="font-size:11px;color:var(--muted);display:none">↕ Drive</div>
+    <div class="status-dot" id="statusDot"></div>
+  </div>
+</header>
+
+<!-- DASHBOARD -->
+<div id="page-dashboard" class="page active"><div id="dashboardContent"></div></div>
+
+<!-- SAISIE -->
+<div id="page-saisie" class="page">
+  <div class="card">
+    <div class="card-title">Nouvelle mesure</div>
+    <div class="field">
+      <label>Date &amp; heure</label>
+      <input type="datetime-local" id="inputDatetime"/>
+    </div>
+    <div class="field">
+      <label>DEP — Moyenne sur 3 souffles (L/min)</label>
+      <div class="dep-inputs">
+        <div class="dep-field"><label>Souffle 1</label><input type="number" id="dep1" placeholder="—" min="50" max="900" oninput="updateDepAvg()"/></div>
+        <div class="dep-field"><label>Souffle 2</label><input type="number" id="dep2" placeholder="—" min="50" max="900" oninput="updateDepAvg()"/></div>
+        <div class="dep-field"><label>Souffle 3</label><input type="number" id="dep3" placeholder="—" min="50" max="900" oninput="updateDepAvg()"/></div>
+      </div>
+      <div class="dep-avg-display" id="depAvgDisplay" style="display:none">
+        <span class="dep-avg-label">Moyenne calculée</span>
+        <span class="dep-avg-value" id="depAvgValue">—</span>
+      </div>
+    </div>
+    <div class="field">
+      <label>SpO₂ — Oxymétrie de pouls (%)</label>
+      <input type="number" id="inputSpO2" placeholder="ex. 97" min="70" max="100"/>
+    </div>
+    <div class="field">
+      <label>Prises Easyhaler aujourd'hui</label>
+      <div class="easyhaler-btns">
+        <button class="easyh-btn" data-val="0" onclick="selectEasy(0)">0</button>
+        <button class="easyh-btn" data-val="1" onclick="selectEasy(1)">1</button>
+        <button class="easyh-btn" data-val="2" onclick="selectEasy(2)">2</button>
+        <button class="easyh-btn" data-val="3" onclick="selectEasy(3)">3</button>
+        <button class="easyh-btn" data-val="4" onclick="selectEasy(4)">4</button>
+        <button class="easyh-btn" data-val="5" onclick="selectEasy(5)">5</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>Commentaire (facultatif)</label>
+      <textarea id="inputComment" placeholder="Symptômes, contexte, météo…"></textarea>
+    </div>
+    <button class="btn-primary" onclick="saveMeasure()">Enregistrer la mesure</button>
+  </div>
+</div>
+
+<!-- HISTORIQUE -->
+<div id="page-historique" class="page">
+  <div class="section-header">
+    <div class="card-title" style="margin:0">Historique</div>
+    <button class="icon-btn" onclick="exportCSV()" title="Exporter CSV">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+    </button>
+  </div>
+  <div id="historyList"></div>
+</div>
+
+<!-- RÉGLAGES -->
+<div id="page-settings" class="page"><div id="settingsContent"></div></div>
+
+<nav class="nav">
+  <button class="nav-btn active" onclick="showPage('dashboard',this)">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+    Tableau
+  </button>
+  <button class="nav-btn" onclick="showPage('saisie',this)">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+    Mesure
+  </button>
+  <button class="nav-btn" onclick="showPage('historique',this)">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+    Historique
+  </button>
+  <button class="nav-btn" onclick="showPage('settings',this)">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+    Réglages
+  </button>
+</nav>
+
+<!-- MODAL EDIT -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Modifier la mesure</div>
+      <button class="modal-close" onclick="closeEditModal()">✕</button>
+    </div>
+    <div class="field"><label>Date &amp; heure</label><input type="datetime-local" id="editDatetime"/></div>
+    <div class="field">
+      <label>DEP — 3 souffles (L/min)</label>
+      <div class="dep-inputs">
+        <div class="dep-field"><label>Souffle 1</label><input type="number" id="editDep1" placeholder="—" min="50" max="900" oninput="updateEditDepAvg()"/></div>
+        <div class="dep-field"><label>Souffle 2</label><input type="number" id="editDep2" placeholder="—" min="50" max="900" oninput="updateEditDepAvg()"/></div>
+        <div class="dep-field"><label>Souffle 3</label><input type="number" id="editDep3" placeholder="—" min="50" max="900" oninput="updateEditDepAvg()"/></div>
+      </div>
+      <div class="dep-avg-display" id="editDepAvgDisplay" style="display:none">
+        <span class="dep-avg-label">Moyenne calculée</span>
+        <span class="dep-avg-value" id="editDepAvgValue">—</span>
+      </div>
+    </div>
+    <div class="field"><label>SpO₂ (%)</label><input type="number" id="editSpO2" min="70" max="100"/></div>
+    <div class="field">
+      <label>Prises Easyhaler</label>
+      <div class="easyhaler-btns" id="editEasyBtns">
+        <button class="easyh-btn" data-val="0" onclick="selectEditEasy(0)">0</button>
+        <button class="easyh-btn" data-val="1" onclick="selectEditEasy(1)">1</button>
+        <button class="easyh-btn" data-val="2" onclick="selectEditEasy(2)">2</button>
+        <button class="easyh-btn" data-val="3" onclick="selectEditEasy(3)">3</button>
+        <button class="easyh-btn" data-val="4" onclick="selectEditEasy(4)">4</button>
+        <button class="easyh-btn" data-val="5" onclick="selectEditEasy(5)">5</button>
+      </div>
+    </div>
+    <div class="field"><label>Commentaire</label><textarea id="editComment" placeholder="Symptômes, contexte…"></textarea></div>
+    <button class="btn-primary" onclick="saveEdit()">Enregistrer les modifications</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════
+//  CONFIG GOOGLE DRIVE
+//  ⚠️  Remplacer par votre Client ID Google Cloud
+//  (type "Application Android" ou "Application de bureau")
+//  Les données vont dans le Drive de CHAQUE utilisateur — pas le vôtre.
+// ══════════════════════════════════════════
+const GOOGLE_CLIENT_ID = '__GOOGLE_CLIENT_ID__';
+const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.email';
+const GDRIVE_FILENAME = 'asthmetrack_data.json';
+const IS_CAPACITOR = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+
+// ══════════════════════════════════════════
+//  DATA
+// ══════════════════════════════════════════
+const DB = {
+  get measures() { try{return JSON.parse(localStorage.getItem('at_measures')||'[]');}catch(e){return[];} },
+  set measures(v) { localStorage.setItem('at_measures',JSON.stringify(v)); },
+  get bestDEP() { return parseFloat(localStorage.getItem('at_bestDEP')||'450'); },
+  set bestDEP(v) { localStorage.setItem('at_bestDEP',v); },
+  get reminders() { try{return JSON.parse(localStorage.getItem('at_reminders')||'[]');}catch(e){return[];} },
+  set reminders(v) { localStorage.setItem('at_reminders',JSON.stringify(v)); },
+  get driveToken() { return localStorage.getItem('at_driveToken')||null; },
+  set driveToken(v) { v?localStorage.setItem('at_driveToken',v):localStorage.removeItem('at_driveToken'); },
+  get driveTokenExpiry() { return parseInt(localStorage.getItem('at_driveTokenExpiry')||'0'); },
+  set driveTokenExpiry(v) { localStorage.setItem('at_driveTokenExpiry',v); },
+  get driveFileId() { return localStorage.getItem('at_driveFileId')||null; },
+  set driveFileId(v) { v?localStorage.setItem('at_driveFileId',v):localStorage.removeItem('at_driveFileId'); },
+  get driveUser() { return localStorage.getItem('at_driveUser')||null; },
+  set driveUser(v) { v?localStorage.setItem('at_driveUser',v):localStorage.removeItem('at_driveUser'); },
+  get driveAvatar() { return localStorage.getItem('at_driveAvatar')||null; },
+  set driveAvatar(v) { v?localStorage.setItem('at_driveAvatar',v):localStorage.removeItem('at_driveAvatar'); },
+};
+
+// ══════════════════════════════════════════
+//  ZONES
+// ══════════════════════════════════════════
+function depZone(dep){const p=(dep/DB.bestDEP)*100;return p>=80?'green':p>=60?'yellow':'red';}
+function spo2Zone(s){return s>=95?'green':s>=90?'yellow':'red';}
+function zoneLabel(z){return{green:'🟢 Vert',yellow:'🟡 Jaune',red:'🔴 Rouge'}[z];}
+function zoneClass(z){return'zone-'+z;}
+
+// ══════════════════════════════════════════
+//  NAV
+// ══════════════════════════════════════════
+let currentPage='dashboard';
+function showPage(id,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  if(btn)btn.classList.add('active');
+  currentPage=id;
+  if(id==='dashboard')renderDashboard();
+  if(id==='historique')renderHistory();
+  if(id==='settings')renderSettings();
+  if(id==='saisie')initForm();
+}
+
+// ══════════════════════════════════════════
+//  TOAST
+// ══════════════════════════════════════════
+function showToast(msg,type=''){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.className='toast'+(type?' '+type:'')+' show';
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+// ══════════════════════════════════════════
+//  DEP AVERAGE
+// ══════════════════════════════════════════
+function calcDepAvg(prefix=''){
+  const vals=['dep1','dep2','dep3'].map(id=>{const el=document.getElementById(prefix+id);return el?parseFloat(el.value):NaN;}).filter(v=>!isNaN(v)&&v>=50&&v<=900);
+  if(!vals.length)return null;
+  return Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
+}
+function updateDepAvg(){
+  const avg=calcDepAvg(''),d=document.getElementById('depAvgDisplay'),v=document.getElementById('depAvgValue');
+  if(avg!==null){d.style.display='flex';v.textContent=avg+' L/min';}else d.style.display='none';
+}
+function updateEditDepAvg(){
+  const avg=calcDepAvg('edit'),d=document.getElementById('editDepAvgDisplay'),v=document.getElementById('editDepAvgValue');
+  if(avg!==null&&d){d.style.display='flex';v.textContent=avg+' L/min';}else if(d)d.style.display='none';
+}
+
+// ══════════════════════════════════════════
+//  FORM
+// ══════════════════════════════════════════
+let selectedEasy=null;
+function initForm(){
+  const now=new Date();now.setSeconds(0,0);
+  document.getElementById('inputDatetime').value=now.toISOString().slice(0,16);
+  ['dep1','dep2','dep3'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('depAvgDisplay').style.display='none';
+  document.getElementById('inputSpO2').value='';
+  document.getElementById('inputComment').value='';
+  selectedEasy=null;
+  document.querySelectorAll('#page-saisie .easyh-btn').forEach(b=>b.classList.remove('selected'));
+}
+function selectEasy(n){
+  selectedEasy=n;
+  document.querySelectorAll('#page-saisie .easyh-btn').forEach(b=>b.classList.toggle('selected',parseInt(b.dataset.val)===n));
+}
+function saveMeasure(){
+  const dep=calcDepAvg(''),spo2=parseFloat(document.getElementById('inputSpO2').value),dt=document.getElementById('inputDatetime').value,comment=document.getElementById('inputComment').value.trim();
+  const dep1=parseFloat(document.getElementById('dep1').value)||null,dep2=parseFloat(document.getElementById('dep2').value)||null,dep3=parseFloat(document.getElementById('dep3').value)||null;
+  if(!dt){showToast('⚠️ Date manquante','error');return;}
+  if(!dep){showToast('⚠️ Saisir au moins un souffle DEP','error');return;}
+  if(!spo2||spo2<70||spo2>100){showToast('⚠️ SpO₂ invalide','error');return;}
+  if(selectedEasy===null){showToast('⚠️ Choisir nbre de prises','error');return;}
+  const measures=DB.measures;
+  measures.unshift({id:Date.now(),dt,dep,dep1,dep2,dep3,spo2,easy:selectedEasy,comment});
+  DB.measures=measures;
+  showToast('✓ Mesure enregistrée');
+  driveAutoSync();
+  setTimeout(()=>showPage('dashboard',document.querySelector('.nav-btn')),800);
+}
+
+// ══════════════════════════════════════════
+//  EDIT MODAL
+// ══════════════════════════════════════════
+let editingId=null,selectedEditEasy=null;
+function openEditModal(id){
+  const m=DB.measures.find(x=>x.id===id);if(!m)return;
+  editingId=id;selectedEditEasy=m.easy;
+  document.getElementById('editDatetime').value=m.dt;
+  document.getElementById('editDep1').value=m.dep1||m.dep||'';
+  document.getElementById('editDep2').value=m.dep2||'';
+  document.getElementById('editDep3').value=m.dep3||'';
+  updateEditDepAvg();
+  document.getElementById('editSpO2').value=m.spo2;
+  document.getElementById('editComment').value=m.comment||'';
+  document.querySelectorAll('#editEasyBtns .easyh-btn').forEach(b=>b.classList.toggle('selected',parseInt(b.dataset.val)===m.easy));
+  document.getElementById('editModal').classList.add('open');
+}
+function closeEditModal(){document.getElementById('editModal').classList.remove('open');editingId=null;}
+function selectEditEasy(n){selectedEditEasy=n;document.querySelectorAll('#editEasyBtns .easyh-btn').forEach(b=>b.classList.toggle('selected',parseInt(b.dataset.val)===n));}
+function saveEdit(){
+  const dep=calcDepAvg('edit'),spo2=parseFloat(document.getElementById('editSpO2').value),dt=document.getElementById('editDatetime').value,comment=document.getElementById('editComment').value.trim();
+  const dep1=parseFloat(document.getElementById('editDep1').value)||null,dep2=parseFloat(document.getElementById('editDep2').value)||null,dep3=parseFloat(document.getElementById('editDep3').value)||null;
+  if(!dep){showToast('⚠️ Saisir au moins un souffle DEP','error');return;}
+  if(!spo2||spo2<70||spo2>100){showToast('⚠️ SpO₂ invalide','error');return;}
+  if(selectedEditEasy===null){showToast('⚠️ Choisir nbre de prises','error');return;}
+  DB.measures=DB.measures.map(m=>m.id!==editingId?m:{...m,dt,dep,dep1,dep2,dep3,spo2,easy:selectedEditEasy,comment});
+  closeEditModal();showToast('✓ Mesure modifiée');driveAutoSync();
+  renderHistory();if(currentPage==='dashboard')renderDashboard();
+}
+document.getElementById('editModal').addEventListener('click',function(e){if(e.target===this)closeEditModal();});
+
+// ══════════════════════════════════════════
+//  DASHBOARD
+// ══════════════════════════════════════════
+function renderDashboard(){
+  const measures=DB.measures,cont=document.getElementById('dashboardContent');
+  if(!measures.length){
+    cont.innerHTML=`<div class="empty-state"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg><p>Aucune mesure.<br/>Ajoutez votre première mesure.</p></div>`;return;
+  }
+  const last=measures[0],dz=depZone(last.dep),sz=spo2Zone(last.spo2),depPct=Math.round((last.dep/DB.bestDEP)*100);
+  const depDetail=[last.dep1,last.dep2,last.dep3].filter(Boolean);
+  const recent=measures.slice(0,14).reverse();
+  const labels=recent.map(m=>{const d=new Date(m.dt);return d.getDate()+'/'+(d.getMonth()+1);});
+  const activeRem=DB.reminders.filter(r=>r.active);
+  cont.innerHTML=`
+    ${activeRem.length?`<div class="card"><div class="card-title">Rappels actifs</div><div>${activeRem.map(r=>`<span class="reminder-badge">🔔 ${r.time} — ${r.label}</span>`).join('')}</div></div>`:''}
+    <div class="card">
+      <div class="card-title">Dernière mesure — ${new Date(last.dt).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</div>
+      <div class="metrics-grid">
+        <div class="metric-box ${dz}">
+          <div class="metric-label">DEP (moy.)</div>
+          <div class="metric-value">${last.dep}</div>
+          <div class="metric-unit">L/min</div>
+          <div class="metric-pct">${depPct}% du meilleur</div>
+          ${depDetail.length>1?`<div class="dep-measurements">${depDetail.join(' · ')}</div>`:''}
+        </div>
+        <div class="metric-box ${sz}">
+          <div class="metric-label">SpO₂</div>
+          <div class="metric-value">${last.spo2}</div>
+          <div class="metric-unit">%</div>
+        </div>
+      </div>
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+        <span class="zone-badge ${zoneClass(dz)}">${zoneLabel(dz)}</span>
+        <span class="zone-badge ${zoneClass(sz)}">${zoneLabel(sz)}</span>
+        <span class="zone-badge" style="background:rgba(79,156,249,.1);color:var(--accent)">💊 ${last.easy} prise${last.easy>1?'s':''}</span>
+      </div>
+      ${last.comment?`<div style="margin-top:10px;font-size:12px;color:var(--muted);font-style:italic">"${last.comment}"</div>`:''}
+    </div>
+    <div class="card"><div class="card-title">DEP — 14 derniers jours</div><div class="chart-wrap"><canvas id="chartDEP"></canvas></div></div>
+    <div class="card"><div class="card-title">SpO₂ — 14 derniers jours</div><div class="chart-wrap"><canvas id="chartSPO2"></canvas></div></div>
+  `;
+  drawLineChart('chartDEP',labels,recent.map(m=>m.dep),'#4f9cf9',50,700);
+  drawLineChart('chartSPO2',labels,recent.map(m=>m.spo2),'#10d9a0',85,100);
+}
+
+function drawLineChart(id,labels,data,color,yMin,yMax){
+  const canvas=document.getElementById(id);if(!canvas)return;
+  const dpr=window.devicePixelRatio||1,W=canvas.offsetWidth||300,H=120;
+  canvas.width=W*dpr;canvas.height=H*dpr;canvas.style.width=W+'px';canvas.style.height=H+'px';
+  const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);
+  const pad={top:10,right:10,bottom:30,left:38},w=W-pad.left-pad.right,h=H-pad.top-pad.bottom;
+  const range=yMax-yMin,toX=i=>pad.left+(i/(data.length-1||1))*w,toY=v=>pad.top+h-((v-yMin)/range)*h;
+  ctx.clearRect(0,0,W,H);if(!data.length)return;
+  ctx.strokeStyle='rgba(255,255,255,0.05)';ctx.lineWidth=1;
+  [0.25,0.5,0.75,1].forEach(t=>{const y=pad.top+h*(1-t);ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(pad.left+w,y);ctx.stroke();ctx.fillStyle='rgba(107,114,128,0.7)';ctx.font='9px DM Mono,monospace';ctx.fillText(Math.round(yMin+range*t),0,y+3);});
+  const grad=ctx.createLinearGradient(0,pad.top,0,pad.top+h);grad.addColorStop(0,color+'40');grad.addColorStop(1,'transparent');
+  if(data.length>1){ctx.beginPath();ctx.moveTo(toX(0),toY(data[0]));data.forEach((v,i)=>{if(i>0)ctx.lineTo(toX(i),toY(v));});ctx.lineTo(toX(data.length-1),pad.top+h);ctx.lineTo(toX(0),pad.top+h);ctx.closePath();ctx.fillStyle=grad;ctx.fill();}
+  ctx.beginPath();ctx.strokeStyle=color;ctx.lineWidth=2;ctx.lineJoin='round';
+  data.forEach((v,i)=>{if(i===0)ctx.moveTo(toX(i),toY(v));else ctx.lineTo(toX(i),toY(v));});ctx.stroke();
+  data.forEach((v,i)=>{ctx.beginPath();ctx.arc(toX(i),toY(v),3,0,Math.PI*2);ctx.fillStyle=color;ctx.fill();ctx.strokeStyle='#0d0f14';ctx.lineWidth=1.5;ctx.stroke();});
+  ctx.fillStyle='rgba(107,114,128,0.7)';ctx.font='9px DM Mono,monospace';ctx.textAlign='center';
+  const step=Math.max(1,Math.floor(labels.length/5));
+  labels.forEach((l,i)=>{if(i%step===0||i===labels.length-1)ctx.fillText(l,toX(i),H-6);});
+}
+
+// ══════════════════════════════════════════
+//  HISTORY
+// ══════════════════════════════════════════
+function renderHistory(){
+  const measures=DB.measures,cont=document.getElementById('historyList');
+  if(!measures.length){cont.innerHTML=`<div class="empty-state"><p>Aucune mesure enregistrée.</p></div>`;return;}
+  cont.innerHTML=measures.map(m=>{
+    const dz=depZone(m.dep),sz=spo2Zone(m.spo2),d=new Date(m.dt);
+    const dateStr=d.toLocaleDateString('fr-FR',{weekday:'short',day:'2-digit',month:'short'})+' '+d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+    const depDetail=[m.dep1,m.dep2,m.dep3].filter(Boolean);
+    return `<div class="history-item">
+      <div style="flex:1">
+        <div class="history-date">${dateStr}</div>
+        <div class="history-vals">
+          <span class="history-chip zone-badge ${zoneClass(dz)}">DEP ${m.dep}${depDetail.length>1?' (moy.)':''}</span>
+          <span class="history-chip zone-badge ${zoneClass(sz)}">SpO₂ ${m.spo2}%</span>
+          <span class="history-chip" style="color:var(--accent)">💊 ${m.easy}</span>
+        </div>
+        ${depDetail.length>1?`<div class="dep-measurements" style="margin-top:4px">Souffles : ${depDetail.join(' · ')}</div>`:''}
+        ${m.comment?`<div class="history-comment">"${m.comment}"</div>`:''}
+      </div>
+      <div class="history-actions">
+        <button class="icon-action-btn edit" onclick="openEditModal(${m.id})">✏️</button>
+        <button class="icon-action-btn del" onclick="deleteMeasure(${m.id})">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function deleteMeasure(id){if(!confirm('Supprimer cette mesure ?'))return;DB.measures=DB.measures.filter(m=>m.id!==id);driveAutoSync();renderHistory();}
+
+// ══════════════════════════════════════════
+//  CSV
+// ══════════════════════════════════════════
+function exportCSV(){
+  const measures=DB.measures;if(!measures.length){showToast('Aucune donnée','error');return;}
+  const header='Date;Heure;DEP moy;Souffle 1;Souffle 2;Souffle 3;Zone DEP;SpO2;Zone SpO2;Prises;Commentaire\n';
+  const rows=measures.map(m=>{const d=new Date(m.dt);return[d.toLocaleDateString('fr-FR'),d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}),m.dep,m.dep1||'',m.dep2||'',m.dep3||'',zoneLabel(depZone(m.dep)),m.spo2,zoneLabel(spo2Zone(m.spo2)),m.easy,'"'+(m.comment||'').replace(/"/g,'""')+'"'].join(';');}).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\uFEFF'+header+rows],{type:'text/csv;charset=utf-8'}));a.download='asthmetrack_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+  showToast('✓ CSV téléchargé');
+}
+
+// ══════════════════════════════════════════
+//  GOOGLE DRIVE — SDK natif Android
+//  Via @capacitor-community/google-auth
+//  Pas de redirect URI, pas de PKCE manuel.
+//  Chaque utilisateur accède à SON Drive.
+// ══════════════════════════════════════════
+
+
+// Plugin Social Login via l'objet global Capacitor (pas d'import dynamique)
+function getSocialLogin() {
+  if (IS_CAPACITOR && window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SocialLogin) {
+    return window.Capacitor.Plugins.SocialLogin;
+  }
+  return null;
+}
+
+async function connectDrive() {
+  setSync(true);
+  try {
+    const SocialLogin = getSocialLogin();
+    if (!SocialLogin) {
+      showToast('Plugin non disponible', 'error');
+      setSync(false);
+      return;
+    }
+    await SocialLogin.initialize({ google: { webClientId: GOOGLE_CLIENT_ID } });
+    const result = await SocialLogin.login({
+      provider: 'google',
+      options: {
+        scopes: ['profile', 'email', 'https://www.googleapis.com/auth/drive.appdata'],
+        filterByAuthorizedAccounts: false,
+      }
+    });
+    const token = result.result.accessToken?.token;
+    if (!token) throw new Error('No access token');
+    DB.driveToken = token;
+    DB.driveTokenExpiry = Date.now() + 3500 * 1000;
+    DB.driveUser = result.result.profile?.email || 'Compte Google';
+    DB.driveAvatar = result.result.profile?.imageUrl || null;
+    await driveSyncDown();
+    renderSettings();
+    showToast('✓ Google Drive connecté');
+  } catch(e) {
+    console.error('Google Auth error:', e);
+    const msg = e && e.message ? e.message : JSON.stringify(e);
+    showToast('Erreur: ' + msg.slice(0,60), 'error');
+  } finally {
+    setSync(false);
+  }
+}
+
+async function ensureValidToken() {
+  if (!DB.driveToken) return false;
+  if (Date.now() < DB.driveTokenExpiry - 60000) return true;
+  try {
+    const SocialLogin = getSocialLogin();
+    if (!SocialLogin) { DB.driveToken = null; return false; }
+    await SocialLogin.initialize({ google: { webClientId: GOOGLE_CLIENT_ID } });
+    const result = await SocialLogin.login({
+      provider: 'google',
+      options: {
+        scopes: ['profile', 'email', 'https://www.googleapis.com/auth/drive.appdata'],
+        filterByAuthorizedAccounts: true,
+      }
+    });
+    const token = result.result.accessToken?.token;
+    if (token) {
+      DB.driveToken = token;
+      DB.driveTokenExpiry = Date.now() + 3500 * 1000;
+      return true;
+    }
+  } catch(e) { DB.driveToken = null; }
+  return false;
+}
+async function fetchDriveUserInfo(token) {
+  try {
+    const r = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', { headers: { Authorization: 'Bearer ' + token } });
+    const d = await r.json();
+    DB.driveUser = d.email || 'Compte Google';
+    DB.driveAvatar = d.picture || null;
+  } catch(e) { DB.driveUser = 'Compte Google'; }
+}
+
+async function disconnectDrive() {
+  if (!confirm('Déconnecter Google Drive ?')) return;
+  try {
+    const SocialLogin = getSocialLogin();
+    if (SocialLogin) await SocialLogin.logout({ provider: 'google' });
+  } catch(e) {}
+  ['at_driveToken','at_driveTokenExpiry','at_driveFileId','at_driveUser','at_driveAvatar'].forEach(k => localStorage.removeItem(k));
+  renderSettings();
+  showToast('✓ Déconnecté');
+}
+
+async function driveSyncUp() {
+  if (!await ensureValidToken()) { showToast('Non connecté à Drive', 'error'); return; }
+  setSync(true);
+  try {
+    const data = JSON.stringify({ measures: DB.measures, bestDEP: DB.bestDEP, reminders: DB.reminders, version: 2 });
+    const metadata = { name: GDRIVE_FILENAME, parents: ['appDataFolder'] };
+    const url = DB.driveFileId
+      ? `https://www.googleapis.com/upload/drive/v3/files/${DB.driveFileId}?uploadType=multipart`
+      : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
+    const method = DB.driveFileId ? 'PATCH' : 'POST';
+    const form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+    form.append('file', new Blob([data], { type: 'application/json' }));
+    const r = await fetch(url, { method, headers: { Authorization: 'Bearer ' + DB.driveToken }, body: form });
+    if (!r.ok) throw new Error(r.status);
+    const j = await r.json();
+    DB.driveFileId = j.id;
+    showToast('✓ Sauvegardé sur Drive');
+  } catch(e) { showToast('Erreur sauvegarde Drive', 'error'); }
+  finally { setSync(false); }
+}
+
+async function driveSyncDown() {
+  if (!await ensureValidToken()) { showToast('Non connecté à Drive', 'error'); return; }
+  setSync(true);
+  try {
+    const search = await fetch(
+      `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='${GDRIVE_FILENAME}'&fields=files(id)`,
+      { headers: { Authorization: 'Bearer ' + DB.driveToken } }
+    );
+    const sj = await search.json();
+    if (!sj.files || !sj.files.length) { showToast('Aucune sauvegarde trouvée'); setSync(false); return; }
+    DB.driveFileId = sj.files[0].id;
+    const dl = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${DB.driveFileId}?alt=media`,
+      { headers: { Authorization: 'Bearer ' + DB.driveToken } }
+    );
+    const d = await dl.json();
+    if (d.measures) DB.measures = d.measures;
+    if (d.bestDEP) DB.bestDEP = d.bestDEP;
+    if (d.reminders) DB.reminders = d.reminders;
+    showToast('✓ Données restaurées depuis Drive');
+    renderDashboard();
+  } catch(e) { showToast('Erreur restauration Drive', 'error'); }
+  finally { setSync(false); }
+}
+
+function driveAutoSync() { if (DB.driveToken) driveSyncUp(); }
+function setSync(on) {
+  document.getElementById('statusDot').className = 'status-dot' + (on ? ' syncing' : '');
+  document.getElementById('syncIndicator').style.display = on ? 'block' : 'none';
+}
+
+function checkOAuthRedirect() { /* plus utilisé — géré nativement par le plugin */ }
+
+// ══════════════════════════════════════════
+//  SETTINGS
+// ══════════════════════════════════════════
+function renderSettings(){
+  const isConnected=!!DB.driveToken;
+  document.getElementById('settingsContent').innerHTML=`
+    <div class="card">
+      <div class="card-title">☁️ Google Drive</div>
+      ${isConnected?`
+        <div class="drive-connected">
+          <div class="drive-avatar">${DB.driveAvatar?`<img src="${DB.driveAvatar}" style="width:40px;height:40px;border-radius:50%;object-fit:cover" onerror="this.style.display='none'"/>`:''}<span style="${DB.driveAvatar?'display:none':''}">👤</span></div>
+          <div class="drive-info">
+            <div class="drive-name">${DB.driveUser||'Compte Google'}</div>
+            <div class="drive-sub">✓ Connecté — sync auto activée</div>
+          </div>
+        </div>
+        <div class="drive-btns">
+          <button class="drive-btn upload" onclick="driveSyncUp()">⬆ Sauvegarder</button>
+          <button class="drive-btn download" onclick="driveSyncDown()">⬇ Restaurer</button>
+          <button class="drive-btn danger" onclick="disconnectDrive()">Déconnecter</button>
+        </div>
+      `:`
+        <p style="font-size:12px;color:var(--muted);margin-bottom:16px">
+          Sauvegardez vos données sur votre Google Drive personnel. Vos données n'appartiennent qu'à vous.
+        </p>
+        <button class="btn-google" onclick="connectDrive()">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+          </svg>
+          Se connecter avec Google
+        </button>
+      `}
+    </div>
+
+    <div class="card">
+      <div class="card-title">Calibration DEP</div>
+      <div class="field"><label>Votre meilleur DEP personnel (L/min)</label><input type="number" id="bestDEPInput" value="${DB.bestDEP}" min="100" max="900"/></div>
+      <button class="btn-primary" onclick="saveBestDEP()">Enregistrer</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Rappels de prises</div>
+      <div id="reminderList"></div>
+      <div class="add-reminder-form">
+        <input type="time" id="reminderTime"/>
+        <input type="text" id="reminderLabel" placeholder="ex. Matin"/>
+        <button class="btn-secondary" onclick="addReminder()">+ Ajouter</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Données</div>
+      <div class="setting-row"><div><div class="setting-label">Exporter CSV</div><div class="setting-sub">Compatible Excel &amp; Google Sheets</div></div><button class="btn-secondary" onclick="exportCSV()">⬇ CSV</button></div>
+      <div class="setting-row"><div><div class="setting-label">Supprimer tout</div><div class="setting-sub">Action irréversible</div></div><button class="btn-secondary" style="color:var(--red);border-color:var(--red)" onclick="clearAll()">Effacer</button></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Zones de référence</div>
+      <div class="setting-row"><span class="zone-badge zone-green">🟢 Verte</span><span style="font-size:12px;color:var(--muted)">DEP ≥ 80% · SpO₂ ≥ 95%</span></div>
+      <div class="setting-row"><span class="zone-badge zone-yellow">🟡 Jaune</span><span style="font-size:12px;color:var(--muted)">DEP 60–80% · SpO₂ 90–94%</span></div>
+      <div class="setting-row"><span class="zone-badge zone-red">🔴 Rouge</span><span style="font-size:12px;color:var(--muted)">DEP &lt; 60% · SpO₂ &lt; 90%</span></div>
+    </div>
+  `;
+  renderReminderList();
+}
+
+function saveBestDEP(){const v=parseFloat(document.getElementById('bestDEPInput').value);if(!v||v<100||v>900){showToast('⚠️ Valeur invalide','error');return;}DB.bestDEP=v;showToast('✓ Meilleur DEP sauvegardé');}
+function clearAll(){if(!confirm('Effacer TOUTES les mesures ?'))return;DB.measures=[];showToast('✓ Données supprimées');}
+
+// ── REMINDERS ──
+let reminderTimers=[];
+function renderReminderList(){
+  const list=document.getElementById('reminderList');if(!list)return;
+  const rem=DB.reminders;
+  if(!rem.length){list.innerHTML=`<p style="color:var(--muted);font-size:12px;margin-bottom:10px">Aucun rappel configuré.</p>`;return;}
+  list.innerHTML=rem.map((r,i)=>`<div class="reminder-item"><div class="reminder-info"><div class="reminder-time">${r.time}</div><div class="reminder-label-text">${r.label}</div></div><label class="toggle"><input type="checkbox" ${r.active?'checked':''} onchange="toggleReminder(${i})"/><span class="toggle-slider"></span></label><button class="reminder-del" onclick="deleteReminder(${i})">✕</button></div>`).join('');
+}
+function addReminder(){
+  const time=document.getElementById('reminderTime').value,label=document.getElementById('reminderLabel').value.trim()||'Rappel';
+  if(!time){showToast('⚠️ Choisir une heure','error');return;}
+  const rem=DB.reminders;rem.push({time,label,active:true});DB.reminders=rem;
+  scheduleReminders();renderReminderList();showToast('✓ Rappel ajouté');
+}
+function toggleReminder(i){const rem=DB.reminders;rem[i].active=!rem[i].active;DB.reminders=rem;scheduleReminders();renderReminderList();if(currentPage==='dashboard')renderDashboard();}
+function deleteReminder(i){const rem=DB.reminders;rem.splice(i,1);DB.reminders=rem;scheduleReminders();renderReminderList();}
+function scheduleReminders(){
+  reminderTimers.forEach(t=>clearTimeout(t));reminderTimers=[];
+  const now=new Date();
+  DB.reminders.filter(r=>r.active).forEach(r=>{
+    const[h,m]=r.time.split(':').map(Number),target=new Date(now);
+    target.setHours(h,m,0,0);if(target<=now)target.setDate(target.getDate()+1);
+    const t=setTimeout(async()=>{
+      try {
+        // Sur Android Capacitor : utilise le plugin Local Notifications
+        if(IS_CAPACITOR && window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications){
+          const LN = window.Capacitor.Plugins.LocalNotifications;
+          await LN.schedule({notifications:[{
+            title:'AsthmeTrack 💊',
+            body: r.label+' — Penser à votre Easyhaler !',
+            id: Math.floor(Math.random()*100000),
+            schedule:{ at: new Date(Date.now()+100) }
+          }]});
+        } else if(typeof Notification !== 'undefined' && Notification.permission==='granted'){
+          // Fallback web
+          new Notification('AsthmeTrack 💊',{body:r.label+' — Penser à votre Easyhaler !'});
+        }
+      } catch(e){ console.warn('Notification error:', e); }
+      scheduleReminders();
+    },target-now);
+    reminderTimers.push(t);
+  });
+}
+
+// ══════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════
+// Capture toutes les erreurs JS pour debug
+window.onerror = function(msg, src, line, col, err) {
+  showToast('JS Error: ' + msg, 'error');
+  console.error('GLOBAL ERROR:', msg, src, line, col, err);
+};
+window.addEventListener('unhandledrejection', function(e) {
+  showToast('Promise Error: ' + e.reason, 'error');
+  console.error('UNHANDLED PROMISE:', e.reason);
+});
+
+document.addEventListener('DOMContentLoaded',()=>{
+  renderDashboard();
+  scheduleReminders(); // Les rappels utilisent le plugin natif
+  const el=document.getElementById('inputDatetime');
+  if(el){const now=new Date();now.setSeconds(0,0);el.value=now.toISOString().slice(0,16);}
+});
+</script>
+</body>
+</html>

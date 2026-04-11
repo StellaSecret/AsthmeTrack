@@ -1,0 +1,134 @@
+name: Build AsthmeTrack
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  # ── JOB 1 : Build ─────────────────────────────────────
+  build:
+    name: Build AAB (Play Store) + APK (sideload)
+    runs-on: ubuntu-latest
+    outputs:
+      artifact-name: ${{ steps.artifact-name.outputs.name }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Inject secrets
+        run: |
+          sed -i "s|__GOOGLE_CLIENT_ID__|${{ secrets.GOOGLE_CLIENT_ID }}|g" www/index.html
+          sed -i "s|__GOOGLE_CLIENT_ID__|${{ secrets.GOOGLE_CLIENT_ID }}|g" capacitor.config.json
+          echo "✓ Secrets injected"
+
+      - name: Capacitor sync
+        run: npx cap sync android
+
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/asthmetrack-release.jks
+
+      - name: Set versionCode
+        run: |
+          sed -i "s/versionCode .*/versionCode ${{ github.run_number }}/" android/app/build.gradle
+          echo "versionCode → ${{ github.run_number }}"
+          grep versionCode android/app/build.gradle
+
+      - name: Build Release AAB
+        run: |
+          cd android
+          ./gradlew bundleRelease \
+            -Pandroid.injected.signing.store.file=$GITHUB_WORKSPACE/android/app/asthmetrack-release.jks \
+            -Pandroid.injected.signing.store.password=${{ secrets.KEYSTORE_PASSWORD }} \
+            -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
+            -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }} \
+            --no-daemon
+
+      - name: Build Release APK
+        run: |
+          cd android
+          ./gradlew assembleRelease \
+            -Pandroid.injected.signing.store.file=$GITHUB_WORKSPACE/android/app/asthmetrack-release.jks \
+            -Pandroid.injected.signing.store.password=${{ secrets.KEYSTORE_PASSWORD }} \
+            -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
+            -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }} \
+            --no-daemon
+
+      - name: Set artifact name
+        id: artifact-name
+        run: echo "name=artifacts-${{ github.run_id }}" >> $GITHUB_OUTPUT
+
+      - name: Collect artifacts
+        run: |
+          mkdir -p dist
+          cp android/app/build/outputs/bundle/release/app-release.aab \
+             dist/asthmetrack-${{ github.run_number }}.aab
+          cp android/app/build/outputs/apk/release/app-release.apk \
+             dist/asthmetrack-${{ github.run_number }}.apk
+          cp android/app/build/outputs/mapping/release/mapping.txt \
+             dist/mapping-${{ github.run_number }}.txt
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-${{ github.run_id }}
+          path: dist/
+          retention-days: 1
+
+  # ── JOB 2 : Release ───────────────────────────────────
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.artifact-name }}
+          path: dist/
+
+      - name: List artifacts
+        run: ls -la dist/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: "AsthmeTrack v1.0.${{ github.run_number }}"
+          body: |
+            Build #${{ github.run_number }} — versionCode ${{ github.run_number }}
+
+            📦 **asthmetrack-${{ github.run_number }}.aab** → Upload sur Play Store
+            📱 **asthmetrack-${{ github.run_number }}.apk** → Installation directe (tests)
+          files: |
+            dist/asthmetrack-${{ github.run_number }}.aab
+            dist/asthmetrack-${{ github.run_number }}.apk
+            dist/mapping-${{ github.run_number }}.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

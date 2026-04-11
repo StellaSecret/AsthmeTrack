@@ -1,0 +1,29 @@
+# ── Node ──────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── Android ───────────────────────────────
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/captures/
+android/*.iml
+*.apk
+*.aab
+
+# ── Capacitor ─────────────────────────────
+.capacitor/
+
+# ── OS ────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Éditeurs ──────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo

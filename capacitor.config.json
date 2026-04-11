@@ -1,0 +1,17 @@
+{
+  "appId": "com.stellasecret.asthmetrack",
+  "appName": "AsthmeTrack",
+  "webDir": "www",
+  "plugins": {
+    "SocialLogin": {
+      "providers": {
+        "google": true,
+        "facebook": false,
+        "apple": false
+      },
+      "google": {
+        "webClientId": "__GOOGLE_CLIENT_ID__"
+      }
+    }
+  }
+}

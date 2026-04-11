@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">AsthmeTrack</string>
+    <string name="title_activity_main">AsthmeTrack</string>
+    <string name="package_name">com.stellasecret.asthmetrack</string>
+    <string name="custom_url_scheme">com.stellasecret.asthmetrack</string>
+</resources>
