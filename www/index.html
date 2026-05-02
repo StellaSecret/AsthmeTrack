@@ -675,7 +675,11 @@ async function driveSyncUp() {
     const j = await r.json();
     DB.driveFileId = j.id;
     showToast('✓ Sauvegardé sur Drive');
-  } catch(e) { showToast('Erreur sauvegarde Drive', 'error'); }
+  } catch(e) {
+    const msg = e && e.message ? e.message : (e && e.status ? 'HTTP '+e.status : JSON.stringify(e));
+    console.error('driveSyncUp error:', e);
+    showToast('Drive: ' + msg.slice(0,80), 'error');
+  }
   finally { setSync(false); }
 }
 
