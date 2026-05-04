@@ -1,0 +1,122 @@
+name: Security Checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  # ── 1. Dépendances npm vulnérables ────────────────────
+  npm-audit:
+    name: NPM Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Audit dependencies
+        run: |
+          npm audit --audit-level=high
+        # high = signale uniquement les vulnérabilités HIGH et CRITICAL
+        # mettre "moderate" pour être plus strict
+
+  # ── 2. Secrets accidentellement commités ──────────────
+  secret-scan:
+    name: Secret Scan (TruffleHog)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: TruffleHog OSS
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
+          head: ${{ github.sha }}
+          extra_args: --debug --only-verified
+
+  # ── 3. Analyse statique du code JS ────────────────────
+  codeql:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Détecte : XSS, injections, eval() dangereux,
+        # données sensibles exposées, etc.
+
+  # ── 4. Dépendances obsolètes ──────────────────────────
+  outdated:
+    name: Check Outdated Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check outdated packages
+        run: npm outdated || true
+        # || true pour ne pas faire échouer le build,
+        # juste afficher les infos dans les logs
+
+  # ── 5. Vérification du placeholder (pas de secret en clair) ──
+  check-placeholders:
+    name: Check No Secrets In Code
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify placeholders are in place
+        run: |
+          echo "Vérification des placeholders..."
+
+          # Vérifier que le Client ID n'est pas en clair dans index.html
+          if grep -q "apps.googleusercontent.com" www/index.html; then
+            echo "❌ ERREUR : Google Client ID en clair dans www/index.html !"
+            exit 1
+          else
+            echo "✅ www/index.html : placeholder OK"
+          fi
+
+          # Vérifier capacitor.config.json
+          if grep -q "apps.googleusercontent.com" capacitor.config.json; then
+            echo "❌ ERREUR : Google Client ID en clair dans capacitor.config.json !"
+            exit 1
+          else
+            echo "✅ capacitor.config.json : placeholder OK"
+          fi
+
+          echo "✅ Tous les secrets sont bien en placeholder"
