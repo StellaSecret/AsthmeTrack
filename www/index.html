@@ -241,7 +241,7 @@
 <div id="page-historique" class="page">
   <div class="section-header">
     <div class="card-title" style="margin:0">Historique</div>
-    <button class="icon-btn" onclick="exportCSV()" title="Exporter CSV">
+    <button class="icon-btn" onclick="exportPDF()" title="Exporter PDF">
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
     </button>
   </div>
@@ -384,6 +384,14 @@ function calcDepAvg(prefix=''){
   if(!vals.length)return null;
   return Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
 }
+function calcDepAvgWithWarn(prefix=''){
+  const raw=['dep1','dep2','dep3'].map(id=>{const el=document.getElementById(prefix+id);const v=parseFloat(el?el.value:NaN);return{id,v};});
+  const ignored=raw.filter(x=>!isNaN(x.v)&&(x.v<50||x.v>900));
+  if(ignored.length)showToast('⚠️ Valeur DEP hors limites (50–900) ignorée','error');
+  const vals=raw.map(x=>x.v).filter(v=>!isNaN(v)&&v>=50&&v<=900);
+  if(!vals.length)return null;
+  return Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
+}
 function updateDepAvg(){
   const avg=calcDepAvg(''),d=document.getElementById('depAvgDisplay'),v=document.getElementById('depAvgValue');
   if(avg!==null){d.style.display='flex';v.textContent=avg+' L/min';}else d.style.display='none';
@@ -412,7 +420,7 @@ function selectEasy(n){
   document.querySelectorAll('#page-saisie .easyh-btn').forEach(b=>b.classList.toggle('selected',parseInt(b.dataset.val)===n));
 }
 function saveMeasure(){
-  const dep=calcDepAvg(''),spo2=parseFloat(document.getElementById('inputSpO2').value),dt=document.getElementById('inputDatetime').value,comment=document.getElementById('inputComment').value.trim();
+  const dep=calcDepAvgWithWarn(''),spo2=parseFloat(document.getElementById('inputSpO2').value),dt=document.getElementById('inputDatetime').value,comment=document.getElementById('inputComment').value.trim();
   const dep1=parseFloat(document.getElementById('dep1').value)||null,dep2=parseFloat(document.getElementById('dep2').value)||null,dep3=parseFloat(document.getElementById('dep3').value)||null;
   if(!dt){showToast('⚠️ Date manquante','error');return;}
   if(!dep){showToast('⚠️ Saisir au moins un souffle DEP','error');return;}
@@ -446,7 +454,7 @@ function openEditModal(id){
 function closeEditModal(){document.getElementById('editModal').classList.remove('open');editingId=null;}
 function selectEditEasy(n){selectedEditEasy=n;document.querySelectorAll('#editEasyBtns .easyh-btn').forEach(b=>b.classList.toggle('selected',parseInt(b.dataset.val)===n));}
 function saveEdit(){
-  const dep=calcDepAvg('edit'),spo2=parseFloat(document.getElementById('editSpO2').value),dt=document.getElementById('editDatetime').value,comment=document.getElementById('editComment').value.trim();
+  const dep=calcDepAvgWithWarn('edit'),spo2=parseFloat(document.getElementById('editSpO2').value),dt=document.getElementById('editDatetime').value,comment=document.getElementById('editComment').value.trim();
   const dep1=parseFloat(document.getElementById('editDep1').value)||null,dep2=parseFloat(document.getElementById('editDep2').value)||null,dep3=parseFloat(document.getElementById('editDep3').value)||null;
   if(!dep){showToast('⚠️ Saisir au moins un souffle DEP','error');return;}
   if(!spo2||spo2<70||spo2>100){showToast('⚠️ SpO₂ invalide','error');return;}
@@ -467,7 +475,8 @@ function renderDashboard(){
   }
   const last=measures[0],dz=depZone(last.dep),sz=spo2Zone(last.spo2),depPct=Math.round((last.dep/DB.bestDEP)*100);
   const depDetail=[last.dep1,last.dep2,last.dep3].filter(Boolean);
-  const recent=measures.slice(0,14).reverse();
+  // Tri par date croissante pour les graphes (14 derniers jours chronologiques)
+  const recent=[...measures].sort((a,b)=>new Date(a.dt)-new Date(b.dt)).slice(-14);
   const labels=recent.map(m=>{const d=new Date(m.dt);return d.getDate()+'/'+(d.getMonth()+1);});
   const activeRem=DB.reminders.filter(r=>r.active);
   cont.innerHTML=`
@@ -553,14 +562,67 @@ function renderHistory(){
 function deleteMeasure(id){if(!confirm('Supprimer cette mesure ?'))return;DB.measures=DB.measures.filter(m=>m.id!==id);driveAutoSync();renderHistory();}
 
 // ══════════════════════════════════════════
-//  CSV
+//  PDF EXPORT
 // ══════════════════════════════════════════
-function exportCSV(){
+function exportPDF(){
   const measures=DB.measures;if(!measures.length){showToast('Aucune donnée','error');return;}
-  const header='Date;Heure;DEP moy;Souffle 1;Souffle 2;Souffle 3;Zone DEP;SpO2;Zone SpO2;Prises;Commentaire\n';
-  const rows=measures.map(m=>{const d=new Date(m.dt);return[d.toLocaleDateString('fr-FR'),d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}),m.dep,m.dep1||'',m.dep2||'',m.dep3||'',zoneLabel(depZone(m.dep)),m.spo2,zoneLabel(spo2Zone(m.spo2)),m.easy,'"'+(m.comment||'').replace(/"/g,'""')+'"'].join(';');}).join('\n');
-  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\uFEFF'+header+rows],{type:'text/csv;charset=utf-8'}));a.download='asthmetrack_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
-  showToast('✓ CSV téléchargé');
+  if(window.jspdf){_doExportPDF(measures);return;}
+  const script=document.createElement('script');
+  script.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+  script.onload=function(){_doExportPDF(measures);};
+  script.onerror=function(){showToast('Erreur chargement jsPDF','error');};
+  document.head.appendChild(script);
+}
+function _doExportPDF(measures){
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const blue=[79,156,249],dark=[22,25,32],muted=[150,160,175],rowAlt=[26,29,38];
+  doc.setFillColor(...dark);doc.rect(0,0,210,297,'F');
+  doc.setFillColor(...blue);doc.rect(0,0,210,18,'F');
+  doc.setTextColor(255,255,255);doc.setFontSize(13);doc.setFont('helvetica','bold');
+  doc.text('AsthmeTrack \u2014 Export des mesures',10,12);
+  doc.setFontSize(8);doc.setFont('helvetica','normal');
+  doc.text('Généré le '+new Date().toLocaleDateString('fr-FR')+' \u00e0 '+new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}),200,12,{align:'right'});
+  const cols=['Date','Heure','DEP','Souffles','Zone','SpO\u2082','Zone','Prises','Commentaire'];
+  const widths=[22,16,18,22,20,14,20,14,44];
+  let y=28;
+  doc.setFillColor(30,34,45);doc.rect(8,y-5,194,7,'F');
+  doc.setTextColor(...blue);doc.setFontSize(7);doc.setFont('helvetica','bold');
+  let x=10;cols.forEach((c,i)=>{doc.text(c,x,y);x+=widths[i];});
+  y+=5;
+  const sorted=[...measures].sort((a,b)=>new Date(b.dt)-new Date(a.dt));
+  sorted.forEach((m,idx)=>{
+    if(y>282){doc.addPage();doc.setFillColor(...dark);doc.rect(0,0,210,297,'F');y=15;}
+    const d=new Date(m.dt);
+    const souffles=[m.dep1,m.dep2,m.dep3].filter(Boolean).join('/');
+    const dz=depZone(m.dep);const zc=dz==='green'?[16,217,160]:dz==='yellow'?[245,166,35]:[240,79,79];
+    const row=[
+      d.toLocaleDateString('fr-FR'),
+      d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}),
+      m.dep+' L/m',
+      souffles||'-',
+      zoneLabel(dz),
+      (m.spo2||'-')+'%',
+      m.spo2?zoneLabel(spo2Zone(m.spo2)):'-',
+      m.easy!=null?m.easy+' pr':'-',
+      (m.comment||'').slice(0,30)
+    ];
+    if(idx%2===0){doc.setFillColor(...rowAlt);doc.rect(8,y-4,194,6,'F');}
+    doc.setFont('helvetica','normal');doc.setFontSize(7);
+    x=10;
+    row.forEach((cell,i)=>{
+      if(i===4){doc.setTextColor(...zc);}
+      else if(i===6&&m.spo2){const sz=spo2Zone(m.spo2);doc.setTextColor(...(sz==='green'?[16,217,160]:sz==='yellow'?[245,166,35]:[240,79,79]));}
+      else{doc.setTextColor(...muted);}
+      doc.text(String(cell||''),x,y,{maxWidth:widths[i]-2});
+      x+=widths[i];
+    });
+    y+=6;
+  });
+  doc.setTextColor(60,70,90);doc.setFontSize(7);
+  doc.text('AsthmeTrack \u2022 '+sorted.length+' mesures export\u00e9es',10,292);
+  doc.save('asthmetrack_'+new Date().toISOString().slice(0,10)+'.pdf');
+  showToast('\u2713 PDF téléchargé');
 }
 
 // ══════════════════════════════════════════
@@ -771,7 +833,7 @@ function renderSettings(){
 
     <div class="card">
       <div class="card-title">Données</div>
-      <div class="setting-row"><div><div class="setting-label">Exporter CSV</div><div class="setting-sub">Compatible Excel &amp; Google Sheets</div></div><button class="btn-secondary" onclick="exportCSV()">⬇ CSV</button></div>
+      <div class="setting-row"><div><div class="setting-label">Exporter PDF</div><div class="setting-sub">Rapport complet de vos mesures</div></div><button class="btn-secondary" onclick="exportPDF()">⬇ PDF</button></div>
       <div class="setting-row"><div><div class="setting-label">Supprimer tout</div><div class="setting-sub">Action irréversible</div></div><button class="btn-secondary" style="color:var(--red);border-color:var(--red)" onclick="clearAll()">Effacer</button></div>
     </div>
 
@@ -847,6 +909,13 @@ window.addEventListener('unhandledrejection', function(e) {
 
 document.addEventListener('DOMContentLoaded',()=>{
   renderDashboard();
+  // Demande la permission de notifications au démarrage
+  if (!IS_CAPACITOR && typeof Notification !== 'undefined' && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+  if (IS_CAPACITOR && window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications) {
+    window.Capacitor.Plugins.LocalNotifications.requestPermissions().catch(function(){});
+  }
   scheduleReminders(); // Les rappels utilisent le plugin natif
   const el=document.getElementById('inputDatetime');
   if(el){const now=new Date();now.setSeconds(0,0);el.value=now.toISOString().slice(0,16);}
