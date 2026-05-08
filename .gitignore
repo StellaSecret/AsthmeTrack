@@ -27,3 +27,8 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+
+# ── Tests ─────────────────────────────────
+playwright-report/
+test-results/
+*.zip
