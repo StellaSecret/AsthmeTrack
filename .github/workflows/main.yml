@@ -11,7 +11,7 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  # ── SÉCURITÉ 1 : SCAN DE SECRETS (TRUFFLEHOG) ──────────
+  # ── SÉCURITÉ 1 : SCAN DE SECRETS ───────────────────────
   scan-secrets:
     name: Secret Scan
     runs-on: ubuntu-latest
@@ -19,7 +19,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - name: TruffleHog OSS
         uses: trufflesecurity/trufflehog@main
         with:
@@ -28,7 +27,7 @@ jobs:
           head: ${{ github.sha }}
           extra_args: --debug --only-verified
 
-  # ── SÉCURITÉ 2 : ANALYSE STATIQUE (CODEQL) ─────────────
+  # ── SÉCURITÉ 2 : ANALYSE STATIQUE ──────────────────────
   codeql-analysis:
     name: CodeQL
     runs-on: ubuntu-latest
@@ -42,11 +41,10 @@ jobs:
         uses: github/codeql-action/init@v3
         with:
           languages: javascript
-
       - name: Perform Analysis
         uses: github/codeql-action/analyze@v3
 
-  # ── SÉCURITÉ 3 : AUDIT DÉPENDANCES (NPM) ───────────────
+  # ── SÉCURITÉ 3 : AUDIT DÉPENDANCES ─────────────────────
   npm-security:
     name: NPM Audit & Placeholders
     runs-on: ubuntu-latest
@@ -56,23 +54,45 @@ jobs:
         with:
           node-version: 22
           cache: npm
-
       - name: Install
         run: npm ci
-
       - name: Audit
         run: npm audit --audit-level=high
-
       - name: Verify Placeholders
         run: |
           if grep -q "apps.googleusercontent.com" www/index.html || grep -q "apps.googleusercontent.com" capacitor.config.json; then
             echo "❌ Google Client ID en clair !" && exit 1
           fi
 
-  # ── BUILD ANDROID (Attend que TOUTE la sécurité soit OK) ──
+  # ── TESTS NON-RÉGRESSION (Playwright) ──────────────────
+  playwright:
+    name: Playwright Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+      - name: Run tests
+        run: npm test
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30
+
+  # ── BUILD ANDROID (Attend sécurité + tests) ─────────────
   build:
     name: Build Android
-    needs: [scan-secrets, codeql-analysis, npm-security] # <--- PARALLÉLISATION ICI
+    needs: [scan-secrets, codeql-analysis, npm-security, playwright]
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     outputs:
@@ -87,24 +107,19 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-
       - name: Install & Sync
         run: |
           npm ci
           sed -i "s|__GOOGLE_CLIENT_ID__|${{ secrets.GOOGLE_CLIENT_ID }}|g" www/index.html
           sed -i "s|__GOOGLE_CLIENT_ID__|${{ secrets.GOOGLE_CLIENT_ID }}|g" capacitor.config.json
           npx cap sync android
-
       - name: Decode keystore
-        run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/asthmetrack-release.jks
-
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/asthmetrack-release.jks
       - name: Set versionCode
         run: |
           sed -i "s/versionCode .*/versionCode ${{ github.run_number }}/" android/app/build.gradle
           echo "versionCode → ${{ github.run_number }}"
           grep versionCode android/app/build.gradle
-
       - name: Build Bundle & APK
         run: |
           cd android
@@ -117,11 +132,9 @@ jobs:
             -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }} --no-daemon
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-
       - name: Set artifact name
         id: artifact-name
         run: echo "name=artifacts-${{ github.run_id }}" >> $GITHUB_OUTPUT
-
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
@@ -131,7 +144,7 @@ jobs:
             android/app/build/outputs/apk/release/app-release.apk
           retention-days: 1
 
-  # ── RELEASE (Attend le build) ─────────────────────────
+  # ── RELEASE ─────────────────────────────────────────────
   release:
     name: Create Release
     needs: build
@@ -143,7 +156,6 @@ jobs:
         with:
           name: ${{ needs.build.outputs.artifact-name }}
           path: dist/
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:

@@ -379,13 +379,14 @@ function showToast(msg,type=''){
 // ══════════════════════════════════════════
 //  DEP AVERAGE
 // ══════════════════════════════════════════
+function _depFieldId(prefix,n){return prefix?prefix+'Dep'+n:'dep'+n;}
 function calcDepAvg(prefix=''){
-  const vals=['dep1','dep2','dep3'].map(id=>{const el=document.getElementById(prefix+id);return el?parseFloat(el.value):NaN;}).filter(v=>!isNaN(v)&&v>=50&&v<=900);
+  const vals=[1,2,3].map(n=>{const el=document.getElementById(_depFieldId(prefix,n));return el?parseFloat(el.value):NaN;}).filter(v=>!isNaN(v)&&v>=50&&v<=900);
   if(!vals.length)return null;
   return Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
 }
 function calcDepAvgWithWarn(prefix=''){
-  const raw=['dep1','dep2','dep3'].map(id=>{const el=document.getElementById(prefix+id);const v=parseFloat(el?el.value:NaN);return{id,v};});
+  const raw=[1,2,3].map(n=>{const el=document.getElementById(_depFieldId(prefix,n));const v=parseFloat(el?el.value:NaN);return{n,v};});
   const ignored=raw.filter(x=>!isNaN(x.v)&&(x.v<50||x.v>900));
   if(ignored.length)showToast('⚠️ Valeur DEP hors limites (50–900) ignorée','error');
   const vals=raw.map(x=>x.v).filter(v=>!isNaN(v)&&v>=50&&v<=900);
