@@ -24,7 +24,11 @@ test.describe('Navigation & smoke tests', () => {
   });
 
   test('dashboard vide affiche un état vide', async ({ page }) => {
+    await page.addInitScript(() => localStorage.clear());
     await page.goto('/');
+    // renderDashboard() est synchrone mais appelé dans DOMContentLoaded —
+    // on attend que #dashboardContent soit peuplé avant d'évaluer le locator
+    await page.waitForSelector('#dashboardContent .empty-state');
     await expect(page.locator('.empty-state')).toBeVisible();
   });
 
@@ -135,7 +139,7 @@ test.describe('Dashboard — métriques', () => {
     ]);
     await seedBestDEP(page, 450);
     await page.goto('/');
-    // measures[0] = dep:440 (plus récent, trié par seedMeasures)
+    await page.waitForSelector('#dashboardContent .metric-value');
     await expect(page.locator('.metric-value').first()).toContainText('440');
   });
 
@@ -143,6 +147,7 @@ test.describe('Dashboard — métriques', () => {
     await seedMeasures(page, [fakeMeasure({ dep: 340 })]);
     await seedBestDEP(page, 400);
     await page.goto('/');
+    await page.waitForSelector('#dashboardContent .metric-box');
     await expect(page.locator('.metric-box.green').first()).toBeVisible();
   });
 
@@ -150,6 +155,7 @@ test.describe('Dashboard — métriques', () => {
     await seedMeasures(page, [fakeMeasure({ dep: 250 })]);
     await seedBestDEP(page, 500);
     await page.goto('/');
+    await page.waitForSelector('#dashboardContent .metric-box');
     await expect(page.locator('.metric-box.red').first()).toBeVisible();
   });
 

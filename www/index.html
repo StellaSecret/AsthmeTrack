@@ -192,7 +192,23 @@
     color: var(--danger);
     margin-top: 4px;
   }
+
+  /* Champ SpO2 hors limites */
+  .spo2-field input.spo2-invalid,
+  .field input.spo2-invalid {
+    border-color: var(--danger) !important;
+    box-shadow: 0 0 0 2px rgba(240,79,79,.25);
+  }
+  .spo2-wrap { position: relative; }
+  .spo2-hint {
+    font-size: 11px;
+    color: var(--danger);
+    margin-top: 4px;
+    display: none;
+  }
+  .spo2-hint.visible { display: block; }
 </style>
+  <script src="jspdf.umd.min.js"></script>
 </head>
 <body>
 
@@ -229,7 +245,7 @@
     </div>
     <div class="field">
       <label>SpO₂ — Oxymétrie de pouls (%)</label>
-      <input type="number" id="inputSpO2" placeholder="ex. 97" min="70" max="100"/>
+      <div class="spo2-wrap"><input type="number" id="inputSpO2" placeholder="ex. 97" min="70" max="100" oninput="updateSpo2Display(this)"/><span class="spo2-hint" id="spo2Hint">⚠ Hors limites (70–100)</span></div>
     </div>
     <div class="field">
       <label>Prises Easyhaler aujourd'hui</label>
@@ -303,7 +319,7 @@
         <span class="dep-avg-value" id="editDepAvgValue">—</span>
       </div>
     </div>
-    <div class="field"><label>SpO₂ (%)</label><input type="number" id="editSpO2" min="70" max="100"/></div>
+    <div class="field"><label>SpO₂ (%)</label><div class="spo2-wrap"><input type="number" id="editSpO2" min="70" max="100" oninput="updateSpo2Display(this)"/><span class="spo2-hint" id="editSpo2Hint">⚠ Hors limites (70–100)</span></div></div>
     <div class="field">
       <label>Prises Easyhaler</label>
       <div class="easyhaler-btns" id="editEasyBtns">
@@ -405,6 +421,12 @@ function calcDepAvgWithWarn(prefix=''){
   const vals=raw.map(x=>x.v).filter(v=>!isNaN(v)&&v>=50&&v<=900);
   if(!vals.length)return null;
   return Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
+}
+function updateSpo2Display(el){
+  const v=parseFloat(el.value),hintId=el.id==='inputSpO2'?'spo2Hint':'editSpo2Hint',hint=document.getElementById(hintId);
+  if(!el.value){el.classList.remove('spo2-invalid');if(hint)hint.classList.remove('visible');return;}
+  if(!isNaN(v)&&(v<70||v>100)){el.classList.add('spo2-invalid');if(hint)hint.classList.add('visible');}
+  else{el.classList.remove('spo2-invalid');if(hint)hint.classList.remove('visible');}
 }
 function updateDepAvg(){
   const avg=calcDepAvg(''),d=document.getElementById('depAvgDisplay'),v=document.getElementById('depAvgValue');
@@ -552,7 +574,9 @@ function drawLineChart(id,labels,data,color,yMin,yMax){
   canvas.width=W*dpr;canvas.height=H*dpr;canvas.style.width=W+'px';canvas.style.height=H+'px';
   const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);
   const pad={top:10,right:10,bottom:30,left:38},w=W-pad.left-pad.right,h=H-pad.top-pad.bottom;
-  const range=yMax-yMin,toX=i=>pad.left+(i/(data.length-1||1))*w,toY=v=>pad.top+h-((v-yMin)/range)*h;
+  // Ajuste les bornes dynamiquement pour que les points extrêmes restent visibles
+  if(data.length){const lo=Math.min(...data),hi=Math.max(...data);yMin=Math.min(yMin,lo);yMax=Math.max(yMax,hi);}
+  const range=yMax-yMin||1,toX=i=>pad.left+(i/(data.length-1||1))*w,toY=v=>pad.top+h-((v-yMin)/range)*h;
   ctx.clearRect(0,0,W,H);if(!data.length)return;
   ctx.strokeStyle='rgba(255,255,255,0.05)';ctx.lineWidth=1;
   [0.25,0.5,0.75,1].forEach(t=>{const y=pad.top+h*(1-t);ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(pad.left+w,y);ctx.stroke();ctx.fillStyle='rgba(107,114,128,0.7)';ctx.font='9px DM Mono,monospace';ctx.fillText(Math.round(yMin+range*t),0,y+3);});
@@ -601,14 +625,10 @@ function deleteMeasure(id){if(!confirm('Supprimer cette mesure ?'))return;DB.mea
 // ══════════════════════════════════════════
 function exportPDF(){
   const measures=DB.measures;if(!measures.length){showToast('Aucune donnée','error');return;}
-  if(window.jspdf){_doExportPDF(measures);return;}
-  const script=document.createElement('script');
-  script.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-  script.onload=function(){_doExportPDF(measures);};
-  script.onerror=function(){showToast('Erreur chargement jsPDF','error');};
-  document.head.appendChild(script);
+  if(!window.jspdf){showToast('Erreur: jsPDF non chargé','error');return;}
+  _doExportPDF(measures);
 }
-function _doExportPDF(measures){
+async function _doExportPDF(measures){
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
   const blue=[79,156,249],dark=[22,25,32],muted=[150,160,175],rowAlt=[26,29,38];
@@ -656,8 +676,75 @@ function _doExportPDF(measures){
   });
   doc.setTextColor(60,70,90);doc.setFontSize(7);
   doc.text('AsthmeTrack \u2022 '+sorted.length+' mesures export\u00e9es',10,292);
-  doc.save('asthmetrack_'+new Date().toISOString().slice(0,10)+'.pdf');
-  showToast('\u2713 PDF téléchargé');
+
+  // ── Page 2 : Graphes DEP et SpO₂ ──────────────────────────────────────
+  const canvasDep = document.getElementById('chartDEP');
+  const canvasSpo = document.getElementById('chartSPO2');
+  if (canvasDep || canvasSpo) {
+    doc.addPage();
+    doc.setFillColor(...dark); doc.rect(0,0,210,297,'F');
+    doc.setFillColor(...blue); doc.rect(0,0,210,12,'F');
+    doc.setTextColor(255,255,255); doc.setFontSize(11); doc.setFont('helvetica','bold');
+    doc.text('Graphes — évolution sur 14 jours',10,9);
+
+    let gy = 22;
+    const chartW = 190, chartH = 55;
+
+    if (canvasDep && canvasDep.width > 0) {
+      try {
+        const imgDep = canvasDep.toDataURL('image/png');
+        doc.setFillColor(30,34,45); doc.rect(8,gy-5,194,chartH+12,'F');
+        doc.setTextColor(...blue); doc.setFontSize(8); doc.setFont('helvetica','bold');
+        doc.text('DEP (L/min)',10,gy);
+        doc.addImage(imgDep,'PNG',10,gy+3,chartW,chartH);
+        gy += chartH + 18;
+      } catch(e) { console.warn('PDF chart DEP error:', e); }
+    }
+
+    if (canvasSpo && canvasSpo.width > 0) {
+      try {
+        const imgSpo = canvasSpo.toDataURL('image/png');
+        doc.setFillColor(30,34,45); doc.rect(8,gy-5,194,chartH+12,'F');
+        doc.setTextColor(16,217,160); doc.setFontSize(8); doc.setFont('helvetica','bold');
+        doc.text('SpO₂ (%)',10,gy);
+        doc.addImage(imgSpo,'PNG',10,gy+3,chartW,chartH);
+      } catch(e) { console.warn('PDF chart SpO2 error:', e); }
+    }
+
+    doc.setTextColor(60,70,90); doc.setFontSize(7);
+    doc.text('Graphes générés depuis les 14 dernières mesures enregistrées',10,292);
+  }
+  // ──────────────────────────────────────────────────────────────────────
+
+  const filename = 'asthmetrack_'+new Date().toISOString().slice(0,10)+'.pdf';
+  if (IS_CAPACITOR) {
+    // Android : sauvegarde dans le dossier Documents via @capacitor/filesystem
+    // puis propose le partage via @capacitor/share
+    const b64data = doc.output('datauristring').split(',')[1]; // base64 pur sans préfixe
+    try {
+      // Les plugins Capacitor sont exposés sur window.Capacitor.Plugins
+      const Filesystem = window.Capacitor?.Plugins?.Filesystem;
+      const Share = window.Capacitor?.Plugins?.Share;
+      if (!Filesystem) throw new Error('Plugin Filesystem non disponible — relancez après npx cap sync');
+      await Filesystem.writeFile({
+        path: filename,
+        data: b64data,
+        directory: 'DOCUMENTS',
+        recursive: true,
+      });
+      showToast('✓ PDF sauvegardé dans Documents');
+      if (Share) {
+        const uriResult = await Filesystem.getUri({ path: filename, directory: 'DOCUMENTS' });
+        await Share.share({ title: filename, url: uriResult.uri, dialogTitle: 'Partager le PDF' });
+      }
+    } catch(fsErr) {
+      console.error('PDF Filesystem error:', fsErr);
+      showToast('Erreur sauvegarde: ' + (fsErr.message||'').slice(0,60), 'error');
+    }
+  } else {
+    doc.save(filename);
+  }
+  showToast('✓ PDF généré');
 }
 
 // ══════════════════════════════════════════
@@ -676,6 +763,34 @@ function getSocialLogin() {
   return null;
 }
 
+
+// Extrait le token OAuth2 Drive depuis la réponse du plugin SocialLogin
+// Le plugin @capgo/capacitor-social-login retourne {idToken, accessToken, scopes} directement
+// (pas de wrapper .result comme on pourrait l'attendre)
+function extractDriveToken(result) {
+  // Plusieurs shapes possibles selon version du plugin et plateforme
+  const r = result?.result ?? result;
+  // accessToken peut être une string directe ou un objet {token}
+  const token = (typeof r?.accessToken === 'string' ? r.accessToken : r?.accessToken?.token)
+             || r?.idToken;
+  return token || null;
+}
+function extractDriveProfile(result) {
+  const r = result?.result ?? result;
+  // Le profil peut venir d'un champ profile, ou être décodé de l'idToken JWT
+  if (r?.profile) return { email: r.profile.email || r.profile.name || 'Compte Google', avatar: r.profile.imageUrl || r.profile.picture || null };
+  // Décode le payload de l'idToken (base64url) pour extraire email et picture
+  try {
+    const payload = JSON.parse(atob(r.idToken.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+    return { email: payload.email || 'Compte Google', avatar: payload.picture || null };
+  } catch(e) {}
+  return { email: 'Compte Google', avatar: null };
+}
+
+// Listener global pour recevoir le résultat du login Android
+// (SocialLogin.login() lance une Activity native — la promesse ne résout jamais sur Android)
+let _driveLoginListener = null;
+
 async function connectDrive() {
   setSync(true);
   try {
@@ -686,28 +801,30 @@ async function connectDrive() {
       return;
     }
     await SocialLogin.initialize({ google: { webClientId: GOOGLE_CLIENT_ID } });
+
+    // Sur Android comme sur Web, login() résout la promesse après retour de l'Activity
+    // (call.resolve() est appelé dans un Runnable Java après GetCredentialResponse)
     const result = await SocialLogin.login({
       provider: 'google',
-      options: {
-        scopes: ['profile', 'email', 'https://www.googleapis.com/auth/drive.appdata'],
-        filterByAuthorizedAccounts: false,
-      }
+      options: { scopes: ['profile', 'email', 'https://www.googleapis.com/auth/drive.appdata'], filterByAuthorizedAccounts: false },
     });
-    const token = result.result.accessToken?.token;
-    if (!token) throw new Error('No access token');
+    console.log('Drive login result:', JSON.stringify(result));
+    const token = extractDriveToken(result);
+    if (!token) { console.error('Drive auth result:', JSON.stringify(result)); throw new Error('Token Drive introuvable — vérifiez la config Google Cloud Console.'); }
+    const profile = extractDriveProfile(result);
     DB.driveToken = token;
     DB.driveTokenExpiry = Date.now() + 3500 * 1000;
-    DB.driveUser = result.result.profile?.email || 'Compte Google';
-    DB.driveAvatar = result.result.profile?.imageUrl || null;
-    await driveSyncDown();
+    DB.driveUser = profile.email;
+    DB.driveAvatar = profile.avatar;
     renderSettings();
     showToast('✓ Google Drive connecté');
+    // Vérifie s'il existe une sauvegarde sur Drive sans écraser les données locales
+    await _driveCheckAndPrompt();
   } catch(e) {
     console.error('Google Auth error:', e);
-    const msg = e && e.message ? e.message : JSON.stringify(e);
-    showToast('Erreur: ' + msg.slice(0,60), 'error');
+    showToast('Drive: ' + (e.message||JSON.stringify(e)).slice(0,80), 'error');
   } finally {
-    setSync(false);
+    if (!IS_CAPACITOR) setSync(false);
   }
 }
 
@@ -725,7 +842,7 @@ async function ensureValidToken() {
         filterByAuthorizedAccounts: true,
       }
     });
-    const token = result.result.accessToken?.token;
+    const token = extractDriveToken(result);
     if (token) {
       DB.driveToken = token;
       DB.driveTokenExpiry = Date.now() + 3500 * 1000;
@@ -741,6 +858,72 @@ async function fetchDriveUserInfo(token) {
     DB.driveUser = d.email || 'Compte Google';
     DB.driveAvatar = d.picture || null;
   } catch(e) { DB.driveUser = 'Compte Google'; }
+}
+
+
+async function _driveCheckAndPrompt() {
+  // Vérifie si une sauvegarde existe sur Drive
+  setSync(true);
+  try {
+    const search = await fetch(
+      `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='${GDRIVE_FILENAME}'&fields=files(id,modifiedTime,size)`,
+      { headers: { Authorization: 'Bearer ' + DB.driveToken } }
+    );
+    if (!search.ok) {
+      const err = await search.text();
+      console.error('Drive search error:', search.status, err);
+      showToast('Drive: erreur API ' + search.status, 'error');
+      setSync(false);
+      return;
+    }
+    const sj = await search.json();
+    setSync(false);
+
+    const hasRemote = sj.files && sj.files.length > 0;
+    const hasLocal = DB.measures && DB.measures.length > 0;
+
+    if (!hasRemote && !hasLocal) {
+      // Rien nulle part — rien à faire
+      showToast('Drive connecté — aucune sauvegarde existante');
+      return;
+    }
+
+    if (!hasRemote && hasLocal) {
+      // Données locales seulement → propose de sauvegarder
+      if (confirm('Aucune sauvegarde sur Drive.\nSauvegarder vos données locales (' + DB.measures.length + ' mesures) ?')) {
+        await driveSyncUp();
+      }
+      return;
+    }
+
+    if (hasRemote && !hasLocal) {
+      // Backup Drive seulement → restaure directement
+      DB.driveFileId = sj.files[0].id;
+      await driveSyncDown();
+      return;
+    }
+
+    // Les deux existent → affiche un choix explicite
+    const modDate = new Date(sj.files[0].modifiedTime).toLocaleDateString('fr-FR', {
+      day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+    const choice = confirm(
+      'Données locales : ' + DB.measures.length + ' mesures.\n' +
+      'Sauvegarde Drive : modifiée le ' + modDate + '.\n\n' +
+      'OK → Restaurer depuis Drive (écrase les données locales)\n' +
+      'Annuler → Sauvegarder les données locales sur Drive'
+    );
+    DB.driveFileId = sj.files[0].id;
+    if (choice) {
+      await driveSyncDown();
+    } else {
+      await driveSyncUp();
+    }
+  } catch(e) {
+    setSync(false);
+    console.error('_driveCheckAndPrompt error:', e);
+    showToast('Drive: ' + (e.message||'erreur inconnue').slice(0,60), 'error');
+  }
 }
 
 async function disconnectDrive() {
@@ -759,23 +942,43 @@ async function driveSyncUp() {
   setSync(true);
   try {
     const data = JSON.stringify({ measures: DB.measures, bestDEP: DB.bestDEP, reminders: DB.reminders, version: 2 });
-    const metadata = { name: GDRIVE_FILENAME, parents: ['appDataFolder'] };
-    const url = DB.driveFileId
-      ? `https://www.googleapis.com/upload/drive/v3/files/${DB.driveFileId}?uploadType=multipart`
+    const isUpdate = !!DB.driveFileId;
+    const url = isUpdate
+      // PATCH : mise à jour — pas de parents dans le metadata (erreur 403 sinon)
+      ? 'https://www.googleapis.com/upload/drive/v3/files/' + DB.driveFileId + '?uploadType=multipart'
+      // POST : création — parents requis pour cibler appDataFolder
       : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
-    const method = DB.driveFileId ? 'PATCH' : 'POST';
+    const method = isUpdate ? 'PATCH' : 'POST';
+    // Sur PATCH on n'envoie pas parents (Drive API v3 le rejette avec 403)
+    const metadata = isUpdate
+      ? { name: GDRIVE_FILENAME }
+      : { name: GDRIVE_FILENAME, parents: ['appDataFolder'] };
     const form = new FormData();
     form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
     form.append('file', new Blob([data], { type: 'application/json' }));
-    const r = await fetch(url, { method, headers: { Authorization: 'Bearer ' + DB.driveToken }, body: form });
-    if (!r.ok) throw new Error(r.status);
+    let r = await fetch(url, { method, headers: { Authorization: 'Bearer ' + DB.driveToken }, body: form });
+    // Si 404 sur PATCH : le fichier n'existe plus sur Drive, on recrée
+    if (!r.ok && r.status === 404 && isUpdate) {
+      console.warn('driveSyncUp: file not found on Drive, recreating...');
+      DB.driveFileId = null;
+      const newMeta = { name: GDRIVE_FILENAME, parents: ['appDataFolder'] };
+      const newForm = new FormData();
+      newForm.append('metadata', new Blob([JSON.stringify(newMeta)], { type: 'application/json' }));
+      newForm.append('file', new Blob([data], { type: 'application/json' }));
+      r = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+        { method: 'POST', headers: { Authorization: 'Bearer ' + DB.driveToken }, body: newForm });
+    }
+    if (!r.ok) {
+      const errText = await r.text();
+      console.error('driveSyncUp error:', r.status, errText);
+      throw new Error('API Drive ' + r.status + ' — ' + errText.slice(0,100));
+    }
     const j = await r.json();
     DB.driveFileId = j.id;
     showToast('✓ Sauvegardé sur Drive');
   } catch(e) {
-    const msg = e && e.message ? e.message : (e && e.status ? 'HTTP '+e.status : JSON.stringify(e));
     console.error('driveSyncUp error:', e);
-    showToast('Drive: ' + msg.slice(0,80), 'error');
+    showToast('Drive: ' + (e.message||JSON.stringify(e)).slice(0,80), 'error');
   }
   finally { setSync(false); }
 }
@@ -788,6 +991,11 @@ async function driveSyncDown() {
       `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='${GDRIVE_FILENAME}'&fields=files(id)`,
       { headers: { Authorization: 'Bearer ' + DB.driveToken } }
     );
+    if (!search.ok) {
+      const errText = await search.text();
+      console.error('driveSyncDown search error:', search.status, errText);
+      throw new Error('API Drive ' + search.status + ' — ' + errText.slice(0,100));
+    }
     const sj = await search.json();
     if (!sj.files || !sj.files.length) { showToast('Aucune sauvegarde trouvée'); setSync(false); return; }
     DB.driveFileId = sj.files[0].id;
