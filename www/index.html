@@ -179,6 +179,19 @@
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
   input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
+
+  /* Champ DEP hors limites (< 50 ou > 900) */
+  .dep-field input.dep-invalid {
+    border-color: var(--danger) !important;
+    box-shadow: 0 0 0 2px rgba(240,79,79,.25);
+  }
+  .dep-field:has(input.dep-invalid)::after {
+    content: '⚠ Hors limites (50–900)';
+    display: block;
+    font-size: 11px;
+    color: var(--danger);
+    margin-top: 4px;
+  }
 </style>
 </head>
 <body>
@@ -396,10 +409,31 @@ function calcDepAvgWithWarn(prefix=''){
 function updateDepAvg(){
   const avg=calcDepAvg(''),d=document.getElementById('depAvgDisplay'),v=document.getElementById('depAvgValue');
   if(avg!==null){d.style.display='flex';v.textContent=avg+' L/min';}else d.style.display='none';
+  // Signale visuellement chaque champ hors limites en temps réel
+  [1,2,3].forEach(n=>{
+    const el=document.getElementById('dep'+n);
+    if(!el||el.value==='')return el&&el.classList.remove('dep-invalid');
+    const v2=parseFloat(el.value);
+    if(!isNaN(v2)&&(v2<50||v2>900)){
+      el.classList.add('dep-invalid');
+    }else{
+      el.classList.remove('dep-invalid');
+    }
+  });
 }
 function updateEditDepAvg(){
   const avg=calcDepAvg('edit'),d=document.getElementById('editDepAvgDisplay'),v=document.getElementById('editDepAvgValue');
-  if(avg!==null&&d){d.style.display='flex';v.textContent=avg+' L/min';}else if(d)d.style.display='none';
+  if(avg!==null){d.style.display='flex';v.textContent=avg+' L/min';}else d.style.display='none';
+  [1,2,3].forEach(n=>{
+    const el=document.getElementById('editDep'+n);
+    if(!el||el.value==='')return el&&el.classList.remove('dep-invalid');
+    const v2=parseFloat(el.value);
+    if(!isNaN(v2)&&(v2<50||v2>900)){
+      el.classList.add('dep-invalid');
+    }else{
+      el.classList.remove('dep-invalid');
+    }
+  });
 }
 
 // ══════════════════════════════════════════
