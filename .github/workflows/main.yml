@@ -117,14 +117,16 @@ jobs:
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/asthmetrack-release.jks
       - name: Set versionCode
         run: |
-          sed -i "s/versionCode .*/versionCode ${{ github.run_number }}/" android/app/build.gradle
+          VCODE=$((28 + ${{ github.run_number }}))
+          sed -i "s/versionCode .*/versionCode $VCODE/" android/app/build.gradle
           echo "versionCode → ${{ github.run_number }}"
           grep versionCode android/app/build.gradle
       - name: Build Bundle & APK
         run: |
           cd android
           chmod +x gradlew
-          sed -i "s/versionCode .*/versionCode ${{ github.run_number }}/" app/build.gradle
+          VCODE=$((28 + ${{ github.run_number }}))
+          sed -i "s/versionCode .*/versionCode $VCODE/" app/build.gradle
           ./gradlew bundleRelease assembleRelease \
             -Pandroid.injected.signing.store.file=$GITHUB_WORKSPACE/android/app/asthmetrack-release.jks \
             -Pandroid.injected.signing.store.password=${{ secrets.KEYSTORE_PASSWORD }} \
