@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" data-theme="dark">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
@@ -26,6 +26,32 @@
     --font-head: 'Syne', sans-serif;
     --font-mono: 'DM Mono', monospace;
   }
+  /* ── Light theme ────────────────────────────────────────────────────────── */
+  html[data-theme="light"] {
+    --bg: #f4f6fb;
+    --surface: #ffffff;
+    --surface2: #edf0f7;
+    --border: #d1d9e6;
+    --text: #1a1d27;
+    --muted: #6b7280;
+    --accent: #2563eb;
+    --accent2: #7c3aed;
+    --green: #059669;
+    --yellow: #d97706;
+    --red: #dc2626;
+    --danger: #dc2626;
+    --green-dim: rgba(5,150,105,0.12);
+    --yellow-dim: rgba(217,119,6,0.12);
+    --red-dim: rgba(220,38,38,0.12);
+  }
+  html[data-theme="light"] body { background: var(--bg); }
+  html[data-theme="light"] .app-header { background: rgba(244,246,251,0.92); }
+  html[data-theme="light"] .nav { background: rgba(244,246,251,0.97); }
+  html[data-theme="light"] .modal-overlay { background: rgba(0,0,0,.4); }
+  html[data-theme="light"] .btn-google { background: #fff; }
+  html[data-theme="light"] canvas { filter: none; }
+  /* chart gridlines readable on light bg */
+
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   body { background: var(--bg); color: var(--text); font-family: var(--font-mono); font-size: 14px; min-height: 100vh; overflow-x: hidden; }
 
@@ -409,12 +435,378 @@ const SecureStore = {
 };
 
 // ══════════════════════════════════════════
+//  I18N — Internationalisation (fr / en)
+// ══════════════════════════════════════════
+const LANG = {
+  fr: {
+    // nav
+    nav_dashboard: 'Tableau', nav_measure: 'Mesure', nav_history: 'Historique', nav_settings: 'Réglages',
+    // dashboard
+    db_no_data: 'Aucune mesure.<br/>Ajoutez votre première mesure.',
+    db_active_reminders: 'Rappels actifs',
+    db_last_measure: 'Dernière mesure',
+    db_dep_avg: 'DEP (moy.)',
+    db_best_pct: '% du meilleur',
+    db_dep_chart: 'DEP — 14 derniers jours',
+    db_spo2_chart: 'SpO₂ — 14 derniers jours',
+    // zones
+    zone_green: '🟢 Vert', zone_yellow: '🟡 Jaune', zone_red: '🔴 Rouge',
+    // saisie
+    new_measure: 'Nouvelle mesure',
+    label_datetime: 'Date & heure',
+    label_dep: 'DEP — Moyenne sur 3 souffles (L/min)',
+    label_breath: (n) => `Souffle ${n}`,
+    label_avg_calc: 'Moyenne calculée',
+    label_spo2: 'SpO₂ — Oxymétrie de pouls (%)',
+    label_spo2_ph: 'ex. 97',
+    spo2_hint: '⚠ Hors limites (70–100)',
+    dep_hint: '⚠ Hors limites (50–900)',
+    label_easyhaler: "Prises Easyhaler aujourd'hui",
+    label_comment: 'Commentaire (facultatif)',
+    comment_ph: 'Symptômes, contexte, météo…',
+    btn_save_measure: 'Enregistrer la mesure',
+    // history
+    history_title: 'Historique',
+    history_empty: 'Aucune mesure enregistrée.',
+    dep_avg_suffix: ' (moy.)',
+    breaths_label: 'Souffles',
+    // edit modal
+    edit_title: 'Modifier la mesure',
+    label_dep_3: 'DEP — 3 souffles (L/min)',
+    label_spo2_short: 'SpO₂ (%)',
+    label_easyhaler_short: 'Prises Easyhaler',
+    label_comment_short: 'Commentaire',
+    comment_ph2: 'Symptômes, contexte…',
+    btn_save_edit: 'Enregistrer les modifications',
+    // settings
+    settings_drive_title: '☁️ Google Drive',
+    settings_drive_desc: "Sauvegardez vos données sur votre Google Drive personnel. Vos données n'appartiennent qu'à vous.",
+    settings_drive_connected: '✓ Connecté — sync auto activée',
+    btn_drive_upload: '⬆ Sauvegarder',
+    btn_drive_download: '⬇ Restaurer',
+    btn_drive_disconnect: 'Déconnecter',
+    btn_google_signin: 'Se connecter avec Google',
+    settings_dep_title: 'Calibration DEP',
+    settings_dep_label: 'Votre meilleur DEP personnel (L/min)',
+    btn_save_dep: 'Enregistrer',
+    settings_reminders_title: 'Rappels de prises',
+    reminders_empty: 'Aucun rappel configuré.',
+    reminder_ph_label: 'ex. Matin',
+    btn_add_reminder: '+ Ajouter',
+    settings_data_title: 'Données',
+    settings_export_pdf_label: 'Exporter PDF',
+    settings_export_pdf_sub: 'Rapport complet de vos mesures',
+    btn_export_pdf: '⬇ PDF',
+    settings_export_json_label: 'Exporter JSON',
+    settings_export_json_sub: 'Sauvegarde brute — tous appareils',
+    btn_export_json: '⬇ JSON',
+    settings_import_json_label: 'Importer JSON',
+    settings_import_json_sub: 'Restaurer depuis un fichier .json',
+    btn_import_json: '⬆ Importer',
+    settings_clear_label: 'Supprimer tout',
+    settings_clear_sub: 'Action irréversible',
+    btn_clear: 'Effacer',
+    settings_appearance_title: 'Apparence',
+    settings_theme_label: 'Thème sombre',
+    settings_lang_label: 'Langue / Language',
+    settings_zones_title: 'Zones de référence',
+    zone_green_desc: 'DEP ≥ 80% · SpO₂ ≥ 95%',
+    zone_yellow_desc: 'DEP 60–80% · SpO₂ 90–94%',
+    zone_red_desc: 'DEP < 60% · SpO₂ < 90%',
+    // toasts & confirms
+    toast_saved: '✓ Mesure enregistrée',
+    toast_edited: '✓ Mesure modifiée',
+    toast_deleted_confirm: 'Supprimer cette mesure ?',
+    toast_best_dep_saved: '✓ Meilleur DEP sauvegardé',
+    toast_best_dep_invalid: '⚠️ Valeur invalide',
+    toast_clear_confirm: 'Effacer TOUTES les mesures ?',
+    toast_cleared: '✓ Données supprimées',
+    toast_reminder_added: '✓ Rappel ajouté',
+    toast_reminder_no_time: '⚠️ Choisir une heure',
+    toast_pdf_no_data: 'Aucune donnée',
+    toast_pdf_error: 'Erreur: jsPDF non chargé',
+    toast_pdf_done: '✓ PDF généré',
+    toast_json_exported: '✓ Sauvegarde JSON téléchargée',
+    toast_json_imported: (n) => `✓ ${n} mesures importées`,
+    toast_json_import_err: (m) => `Erreur import : ${m}`,
+    toast_json_invalid: 'Format invalide — champ "measures" manquant.',
+    import_confirm: (n, existing) => `Importer ${n} mesures ?\nCela remplacera vos ${existing} mesures actuelles.`,
+    err_no_dep: '⚠️ Saisir au moins un souffle DEP',
+    err_spo2: '⚠️ SpO₂ invalide',
+    err_easy: '⚠️ Choisir nbre de prises',
+    err_date: '⚠️ Date manquante',
+    err_dep_range: '⚠️ Valeur DEP hors limites (50–900) ignorée',
+    dose_singular: 'prise', dose_plural: 'prises',
+    // drive
+    drive_connected_toast: '✓ Google Drive connecté',
+    drive_disconnect_confirm: 'Déconnecter Google Drive ?',
+    drive_disconnect_toast: '✓ Déconnecté',
+    drive_no_backup: 'Aucune sauvegarde sur Drive.\nSauvegarder vos données locales (%n mesures) ?',
+    drive_conflict: (local, date) => `Données locales : ${local} mesures.\nSauvegarde Drive : modifiée le ${date}.\n\nOK → Restaurer depuis Drive (écrase les données locales)\nAnnuler → Sauvegarder les données locales sur Drive`,
+    drive_restored: '✓ Données restaurées depuis Drive',
+    drive_saved: '✓ Sauvegardé sur Drive',
+    drive_connected_no_backup: 'Drive connecté — aucune sauvegarde existante',
+    drive_no_backup_found: 'Aucune sauvegarde trouvée',
+    drive_not_connected: 'Non connecté à Drive',
+    drive_plugin_unavailable: 'Plugin non disponible',
+    prise_short: 'pr',
+    // pdf
+    pdf_title: 'AsthmeTrack — Export des mesures',
+    pdf_generated: (date, time) => `Généré le ${date} à ${time}`,
+    pdf_cols: ['Date','Heure','DEP','Souffles','Zone','SpO₂','Zone','Prises','Commentaire'],
+    pdf_footer: (n) => `AsthmeTrack • ${n} mesures exportées`,
+    pdf_charts_title: 'Graphes — évolution sur 14 jours',
+    pdf_dep_label: 'DEP (L/min)',
+    pdf_spo2_label: 'SpO₂ (%)',
+    pdf_charts_footer: 'Graphes générés depuis les 14 dernières mesures enregistrées',
+    pdf_save_error: (m) => `Erreur sauvegarde: ${m}`,
+    locale: 'fr-FR',
+  },
+  en: {
+    // nav
+    nav_dashboard: 'Dashboard', nav_measure: 'Measure', nav_history: 'History', nav_settings: 'Settings',
+    // dashboard
+    db_no_data: 'No measurements.<br/>Add your first measurement.',
+    db_active_reminders: 'Active reminders',
+    db_last_measure: 'Latest measurement',
+    db_dep_avg: 'PEF (avg)',
+    db_best_pct: '% of best',
+    db_dep_chart: 'PEF — last 14 days',
+    db_spo2_chart: 'SpO₂ — last 14 days',
+    // zones
+    zone_green: '🟢 Green', zone_yellow: '🟡 Yellow', zone_red: '🔴 Red',
+    // saisie
+    new_measure: 'New measurement',
+    label_datetime: 'Date & time',
+    label_dep: 'PEF — Average over 3 blows (L/min)',
+    label_breath: (n) => `Blow ${n}`,
+    label_avg_calc: 'Calculated average',
+    label_spo2: 'SpO₂ — Pulse oximetry (%)',
+    label_spo2_ph: 'e.g. 97',
+    spo2_hint: '⚠ Out of range (70–100)',
+    dep_hint: '⚠ Out of range (50–900)',
+    label_easyhaler: 'Easyhaler doses today',
+    label_comment: 'Comment (optional)',
+    comment_ph: 'Symptoms, context, weather…',
+    btn_save_measure: 'Save measurement',
+    // history
+    history_title: 'History',
+    history_empty: 'No measurements recorded.',
+    dep_avg_suffix: ' (avg)',
+    breaths_label: 'Blows',
+    // edit modal
+    edit_title: 'Edit measurement',
+    label_dep_3: 'PEF — 3 blows (L/min)',
+    label_spo2_short: 'SpO₂ (%)',
+    label_easyhaler_short: 'Easyhaler doses',
+    label_comment_short: 'Comment',
+    comment_ph2: 'Symptoms, context…',
+    btn_save_edit: 'Save changes',
+    // settings
+    settings_drive_title: '☁️ Google Drive',
+    settings_drive_desc: "Back up your data to your personal Google Drive. Your data belongs to you only.",
+    settings_drive_connected: '✓ Connected — auto sync on',
+    btn_drive_upload: '⬆ Save',
+    btn_drive_download: '⬇ Restore',
+    btn_drive_disconnect: 'Disconnect',
+    btn_google_signin: 'Sign in with Google',
+    settings_dep_title: 'PEF Calibration',
+    settings_dep_label: 'Your personal best PEF (L/min)',
+    btn_save_dep: 'Save',
+    settings_reminders_title: 'Dose reminders',
+    reminders_empty: 'No reminders set.',
+    reminder_ph_label: 'e.g. Morning',
+    btn_add_reminder: '+ Add',
+    settings_data_title: 'Data',
+    settings_export_pdf_label: 'Export PDF',
+    settings_export_pdf_sub: 'Full report of your measurements',
+    btn_export_pdf: '⬇ PDF',
+    settings_export_json_label: 'Export JSON',
+    settings_export_json_sub: 'Raw backup — any device',
+    btn_export_json: '⬇ JSON',
+    settings_import_json_label: 'Import JSON',
+    settings_import_json_sub: 'Restore from a .json file',
+    btn_import_json: '⬆ Import',
+    settings_clear_label: 'Delete all',
+    settings_clear_sub: 'Irreversible action',
+    btn_clear: 'Delete',
+    settings_appearance_title: 'Appearance',
+    settings_theme_label: 'Dark theme',
+    settings_lang_label: 'Langue / Language',
+    settings_zones_title: 'Reference zones',
+    zone_green_desc: 'PEF ≥ 80% · SpO₂ ≥ 95%',
+    zone_yellow_desc: 'PEF 60–80% · SpO₂ 90–94%',
+    zone_red_desc: 'PEF < 60% · SpO₂ < 90%',
+    // toasts & confirms
+    toast_saved: '✓ Measurement saved',
+    toast_edited: '✓ Measurement updated',
+    toast_deleted_confirm: 'Delete this measurement?',
+    toast_best_dep_saved: '✓ Personal best PEF saved',
+    toast_best_dep_invalid: '⚠️ Invalid value',
+    toast_clear_confirm: 'Delete ALL measurements?',
+    toast_cleared: '✓ Data deleted',
+    toast_reminder_added: '✓ Reminder added',
+    toast_reminder_no_time: '⚠️ Choose a time',
+    toast_pdf_no_data: 'No data',
+    toast_pdf_error: 'Error: jsPDF not loaded',
+    toast_pdf_done: '✓ PDF generated',
+    toast_json_exported: '✓ JSON backup downloaded',
+    toast_json_imported: (n) => `✓ ${n} measurements imported`,
+    toast_json_import_err: (m) => `Import error: ${m}`,
+    toast_json_invalid: 'Invalid format — "measures" field missing.',
+    import_confirm: (n, existing) => `Import ${n} measurements?\nThis will replace your ${existing} current measurements.`,
+    err_no_dep: '⚠️ Enter at least one PEF blow',
+    err_spo2: '⚠️ Invalid SpO₂',
+    err_easy: '⚠️ Choose number of doses',
+    err_date: '⚠️ Date missing',
+    err_dep_range: '⚠️ PEF value out of range (50–900) ignored',
+    dose_singular: 'dose', dose_plural: 'doses',
+    // drive
+    drive_connected_toast: '✓ Google Drive connected',
+    drive_disconnect_confirm: 'Disconnect Google Drive?',
+    drive_disconnect_toast: '✓ Disconnected',
+    drive_no_backup: 'No Drive backup.\nSave your local data (%n measurements)?',
+    drive_conflict: (local, date) => `Local data: ${local} measurements.\nDrive backup: modified ${date}.\n\nOK → Restore from Drive (overwrites local data)\nCancel → Save local data to Drive`,
+    drive_restored: '✓ Data restored from Drive',
+    drive_saved: '✓ Saved to Drive',
+    drive_connected_no_backup: 'Drive connected — no existing backup',
+    drive_no_backup_found: 'No backup found',
+    drive_not_connected: 'Not connected to Drive',
+    drive_plugin_unavailable: 'Plugin unavailable',
+    prise_short: 'dose',
+    // pdf
+    pdf_title: 'AsthmeTrack — Measurement export',
+    pdf_generated: (date, time) => `Generated on ${date} at ${time}`,
+    pdf_cols: ['Date','Time','PEF','Blows','Zone','SpO₂','Zone','Doses','Comment'],
+    pdf_footer: (n) => `AsthmeTrack • ${n} measurements exported`,
+    pdf_charts_title: 'Charts — last 14 days',
+    pdf_dep_label: 'PEF (L/min)',
+    pdf_spo2_label: 'SpO₂ (%)',
+    pdf_charts_footer: 'Charts generated from the last 14 recorded measurements',
+    pdf_save_error: (m) => `Save error: ${m}`,
+    locale: 'en-GB',
+  },
+};
+
+// Active language — reads from localStorage, defaults to 'fr'
+let _lang = localStorage.getItem('at_lang') || 'fr';
+function t(key, ...args) {
+  const v = LANG[_lang]?.[key] ?? LANG['fr'][key];
+  return (typeof v === 'function') ? v(...args) : (v ?? key);
+}
+function setLang(l) {
+  _lang = l;
+  localStorage.setItem('at_lang', l);
+  document.documentElement.lang = l;
+  _rerender();
+}
+function _rerender() {
+  // Re-render every visible section and static HTML strings
+  renderNav();
+  renderStaticHTML();
+  const page = currentPage;
+  if (page === 'dashboard')   renderDashboard();
+  if (page === 'historique')  renderHistory();
+  if (page === 'settings')    renderSettings();
+  if (page === 'saisie')      renderSaisieLabels();
+}
+
+
+// ══════════════════════════════════════════
+//  THEME  (dark / light)
+// ══════════════════════════════════════════
+function applyTheme(dark) {
+  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  localStorage.setItem('at_theme', dark ? 'dark' : 'light');
+}
+function isDark() { return localStorage.getItem('at_theme') !== 'light'; }
+// Apply immediately to avoid flash
+applyTheme(isDark());
+
+// ══════════════════════════════════════════
 //  ZONES
 // ══════════════════════════════════════════
 function depZone(dep){const p=(dep/DB.bestDEP)*100;return p>=80?'green':p>=60?'yellow':'red';}
 function spo2Zone(s){return s>=95?'green':s>=90?'yellow':'red';}
-function zoneLabel(z){return{green:'🟢 Vert',yellow:'🟡 Jaune',red:'🔴 Rouge'}[z];}
+function zoneLabel(z){return{green:t('zone_green'),yellow:t('zone_yellow'),red:t('zone_red')}[z];}
 function zoneClass(z){return'zone-'+z;}
+
+
+// ══════════════════════════════════════════
+//  DYNAMIC LABEL HELPERS
+// ══════════════════════════════════════════
+function renderNav() {
+  const btns = document.querySelectorAll('.nav-btn');
+  const keys = ['nav_dashboard','nav_measure','nav_history','nav_settings'];
+  btns.forEach((btn, i) => {
+    // last child is the text node (after the svg)
+    const textNode = [...btn.childNodes].find(n => n.nodeType === 3 && n.textContent.trim());
+    if (textNode) textNode.textContent = '\n    ' + t(keys[i]) + '\n  ';
+  });
+}
+
+function renderSaisieLabels() {
+  // Use a helper that skips null elements silently
+  const set = (sel, txt) => { const el = document.querySelector(sel); if (el) el.textContent = txt; };
+
+  // ── Measure form (page-saisie) ──────────────────────────────────────────
+  set('#page-saisie .card-title', t('new_measure'));
+
+  // Use :scope-safe individual field IDs and known structure instead of
+  // fragile nth-child indexing (dep-field labels pollute the NodeList).
+  // datetime label: first direct label inside the first .field
+  const fields = document.querySelectorAll('#page-saisie .field');
+  // fields[0] = datetime, fields[1] = DEP, fields[2] = SpO2, fields[3] = easyhaler, fields[4] = comment
+  if (fields[0]) { const l = fields[0].querySelector(':scope > label'); if (l) l.textContent = t('label_datetime'); }
+  if (fields[1]) { const l = fields[1].querySelector(':scope > label'); if (l) l.textContent = t('label_dep'); }
+  // breath sub-labels (children of .dep-field inside the DEP field)
+  document.querySelectorAll('#page-saisie .dep-field label').forEach((el, i) => {
+    el.textContent = t('label_breath', i + 1);
+  });
+  const avgLabel = document.querySelector('#page-saisie .dep-avg-label');
+  if (avgLabel) avgLabel.textContent = t('label_avg_calc');
+  if (fields[2]) { const l = fields[2].querySelector(':scope > label'); if (l) l.textContent = t('label_spo2'); }
+  const spo2Input = document.getElementById('inputSpO2');
+  if (spo2Input) spo2Input.placeholder = t('label_spo2_ph');
+  const spo2Hint = document.getElementById('spo2Hint');
+  if (spo2Hint) spo2Hint.textContent = t('spo2_hint');
+  if (fields[3]) { const l = fields[3].querySelector(':scope > label'); if (l) l.textContent = t('label_easyhaler'); }
+  if (fields[4]) { const l = fields[4].querySelector(':scope > label'); if (l) l.textContent = t('label_comment'); }
+  const commentTA = document.getElementById('inputComment');
+  if (commentTA) commentTA.placeholder = t('comment_ph');
+  const saveBtn = document.querySelector('#page-saisie .btn-primary');
+  if (saveBtn) saveBtn.textContent = t('btn_save_measure');
+
+  // ── History header ───────────────────────────────────────────────────────
+  const histTitle = document.querySelector('#page-historique .card-title');
+  if (histTitle) histTitle.textContent = t('history_title');
+
+  // ── Edit modal ───────────────────────────────────────────────────────────
+  set('#editModal .modal-title', t('edit_title'));
+  const editFields = document.querySelectorAll('#editModal .field');
+  // editFields[0] = datetime, editFields[1] = DEP, editFields[2] = SpO2, editFields[3] = easyhaler, editFields[4] = comment
+  if (editFields[0]) { const l = editFields[0].querySelector(':scope > label'); if (l) l.textContent = t('label_datetime'); }
+  if (editFields[1]) { const l = editFields[1].querySelector(':scope > label'); if (l) l.textContent = t('label_dep_3'); }
+  document.querySelectorAll('#editModal .dep-field label').forEach((el, i) => {
+    el.textContent = t('label_breath', i + 1);
+  });
+  const editAvgLabel = document.querySelector('#editModal .dep-avg-label');
+  if (editAvgLabel) editAvgLabel.textContent = t('label_avg_calc');
+  const editSpo2Hint = document.getElementById('editSpo2Hint');
+  if (editSpo2Hint) editSpo2Hint.textContent = t('spo2_hint');
+  if (editFields[2]) { const l = editFields[2].querySelector(':scope > label'); if (l) l.textContent = t('label_spo2_short'); }
+  if (editFields[3]) { const l = editFields[3].querySelector(':scope > label'); if (l) l.textContent = t('label_easyhaler_short'); }
+  if (editFields[4]) { const l = editFields[4].querySelector(':scope > label'); if (l) l.textContent = t('label_comment_short'); }
+  const editCommentTA = document.getElementById('editComment');
+  if (editCommentTA) editCommentTA.placeholder = t('comment_ph2');
+  const editSaveBtn = document.querySelector('#editModal .btn-primary');
+  if (editSaveBtn) editSaveBtn.textContent = t('btn_save_edit');
+}
+
+function renderStaticHTML() {
+  renderNav();
+  renderSaisieLabels();
+}
 
 // ══════════════════════════════════════════
 //  NAV
@@ -453,7 +845,7 @@ function calcDepAvg(prefix=''){
 function calcDepAvgWithWarn(prefix=''){
   const raw=[1,2,3].map(n=>{const el=document.getElementById(_depFieldId(prefix,n));const v=parseFloat(el?el.value:NaN);return{n,v};});
   const ignored=raw.filter(x=>!isNaN(x.v)&&(x.v<50||x.v>900));
-  if(ignored.length)showToast('⚠️ Valeur DEP hors limites (50–900) ignorée','error');
+  if(ignored.length)showToast(t('err_dep_range'),'error');
   const vals=raw.map(x=>x.v).filter(v=>!isNaN(v)&&v>=50&&v<=900);
   if(!vals.length)return null;
   return Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
@@ -515,14 +907,14 @@ function selectEasy(n){
 function saveMeasure(){
   const dep=calcDepAvgWithWarn(''),spo2=parseFloat(document.getElementById('inputSpO2').value),dt=document.getElementById('inputDatetime').value,comment=document.getElementById('inputComment').value.trim();
   const dep1=parseFloat(document.getElementById('dep1').value)||null,dep2=parseFloat(document.getElementById('dep2').value)||null,dep3=parseFloat(document.getElementById('dep3').value)||null;
-  if(!dt){showToast('⚠️ Date manquante','error');return;}
-  if(!dep){showToast('⚠️ Saisir au moins un souffle DEP','error');return;}
-  if(!spo2||spo2<70||spo2>100){showToast('⚠️ SpO₂ invalide','error');return;}
-  if(selectedEasy===null){showToast('⚠️ Choisir nbre de prises','error');return;}
+  if(!dt){showToast(t('err_date'),'error');return;}
+  if(!dep){showToast(t('err_no_dep'),'error');return;}
+  if(!spo2||spo2<70||spo2>100){showToast(t('err_spo2'),'error');return;}
+  if(selectedEasy===null){showToast(t('err_easy'),'error');return;}
   const measures=DB.measures;
   measures.unshift({id:Date.now(),dt,dep,dep1,dep2,dep3,spo2,easy:selectedEasy,comment});
   DB.measures=measures;
-  showToast('✓ Mesure enregistrée');
+  showToast(t('toast_saved'));
   driveAutoSync();
   setTimeout(()=>showPage('dashboard',document.querySelector('.nav-btn')),800);
 }
@@ -549,11 +941,11 @@ function selectEditEasy(n){selectedEditEasy=n;document.querySelectorAll('#editEa
 function saveEdit(){
   const dep=calcDepAvgWithWarn('edit'),spo2=parseFloat(document.getElementById('editSpO2').value),dt=document.getElementById('editDatetime').value,comment=document.getElementById('editComment').value.trim();
   const dep1=parseFloat(document.getElementById('editDep1').value)||null,dep2=parseFloat(document.getElementById('editDep2').value)||null,dep3=parseFloat(document.getElementById('editDep3').value)||null;
-  if(!dep){showToast('⚠️ Saisir au moins un souffle DEP','error');return;}
-  if(!spo2||spo2<70||spo2>100){showToast('⚠️ SpO₂ invalide','error');return;}
-  if(selectedEditEasy===null){showToast('⚠️ Choisir nbre de prises','error');return;}
+  if(!dep){showToast(t('err_no_dep'),'error');return;}
+  if(!spo2||spo2<70||spo2>100){showToast(t('err_spo2'),'error');return;}
+  if(selectedEditEasy===null){showToast(t('err_easy'),'error');return;}
   DB.measures=DB.measures.map(m=>m.id!==editingId?m:{...m,dt,dep,dep1,dep2,dep3,spo2,easy:selectedEditEasy,comment});
-  closeEditModal();showToast('✓ Mesure modifiée');driveAutoSync();
+  closeEditModal();showToast(t('toast_edited'));driveAutoSync();
   renderHistory();if(currentPage==='dashboard')renderDashboard();
 }
 document.getElementById('editModal').addEventListener('click',function(e){if(e.target===this)closeEditModal();});
@@ -564,7 +956,7 @@ document.getElementById('editModal').addEventListener('click',function(e){if(e.t
 function renderDashboard(){
   const measures=DB.measures,cont=document.getElementById('dashboardContent');
   if(!measures.length){
-    cont.innerHTML=`<div class="empty-state"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg><p>Aucune mesure.<br/>Ajoutez votre première mesure.</p></div>`;return;
+    cont.innerHTML=`<div class="empty-state"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg><p>${t('db_no_data')}</p></div>`;return;
   }
   const last=measures[0],dz=depZone(last.dep),sz=spo2Zone(last.spo2),depPct=Math.round((last.dep/DB.bestDEP)*100);
   const depDetail=[last.dep1,last.dep2,last.dep3].filter(Boolean);
@@ -573,15 +965,15 @@ function renderDashboard(){
   const labels=recent.map(m=>{const d=new Date(m.dt);return d.getDate()+'/'+(d.getMonth()+1);});
   const activeRem=DB.reminders.filter(r=>r.active);
   cont.innerHTML=`
-    ${activeRem.length?`<div class="card"><div class="card-title">Rappels actifs</div><div>${activeRem.map(r=>`<span class="reminder-badge">🔔 ${r.time} — ${r.label}</span>`).join('')}</div></div>`:''}
+    ${activeRem.length?`<div class="card"><div class="card-title">${t('db_active_reminders')}</div><div>${activeRem.map(r=>`<span class="reminder-badge">🔔 ${r.time} — ${r.label}</span>`).join('')}</div></div>`:''}
     <div class="card">
-      <div class="card-title">Dernière mesure — ${new Date(last.dt).toLocaleDateString('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</div>
+      <div class="card-title">${t('db_last_measure')} — ${new Date(last.dt).toLocaleDateString(t('locale'),{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</div>
       <div class="metrics-grid">
         <div class="metric-box ${dz}">
-          <div class="metric-label">DEP (moy.)</div>
+          <div class="metric-label">${t('db_dep_avg')}</div>
           <div class="metric-value">${last.dep}</div>
           <div class="metric-unit">L/min</div>
-          <div class="metric-pct">${depPct}% du meilleur</div>
+          <div class="metric-pct">${depPct}% ${t('db_best_pct')}</div>
           ${depDetail.length>1?`<div class="dep-measurements">${depDetail.join(' · ')}</div>`:''}
         </div>
         <div class="metric-box ${sz}">
@@ -593,12 +985,12 @@ function renderDashboard(){
       <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
         <span class="zone-badge ${zoneClass(dz)}">${zoneLabel(dz)}</span>
         <span class="zone-badge ${zoneClass(sz)}">${zoneLabel(sz)}</span>
-        <span class="zone-badge" style="background:rgba(79,156,249,.1);color:var(--accent)">💊 ${last.easy} prise${last.easy>1?'s':''}</span>
+        <span class="zone-badge" style="background:rgba(79,156,249,.1);color:var(--accent)">💊 ${last.easy} ${last.easy>1?t('dose_plural'):t('dose_singular')}</span>
       </div>
       ${last.comment?`<div style="margin-top:10px;font-size:12px;color:var(--muted);font-style:italic">"${last.comment}"</div>`:''}
     </div>
-    <div class="card"><div class="card-title">DEP — 14 derniers jours</div><div class="chart-wrap"><canvas id="chartDEP"></canvas></div></div>
-    <div class="card"><div class="card-title">SpO₂ — 14 derniers jours</div><div class="chart-wrap"><canvas id="chartSPO2"></canvas></div></div>
+    <div class="card"><div class="card-title">${t('db_dep_chart')}</div><div class="chart-wrap"><canvas id="chartDEP"></canvas></div></div>
+    <div class="card"><div class="card-title">${t('db_spo2_chart')}</div><div class="chart-wrap"><canvas id="chartSPO2"></canvas></div></div>
   `;
   drawLineChart('chartDEP',labels,recent.map(m=>m.dep),'#4f9cf9',50,700);
   drawLineChart('chartSPO2',labels,recent.map(m=>m.spo2),'#10d9a0',85,100);
@@ -614,14 +1006,15 @@ function drawLineChart(id,labels,data,color,yMin,yMax){
   if(data.length){const lo=Math.min(...data),hi=Math.max(...data);yMin=Math.min(yMin,lo);yMax=Math.max(yMax,hi);}
   const range=yMax-yMin||1,toX=i=>pad.left+(i/(data.length-1||1))*w,toY=v=>pad.top+h-((v-yMin)/range)*h;
   ctx.clearRect(0,0,W,H);if(!data.length)return;
-  ctx.strokeStyle='rgba(255,255,255,0.05)';ctx.lineWidth=1;
-  [0.25,0.5,0.75,1].forEach(t=>{const y=pad.top+h*(1-t);ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(pad.left+w,y);ctx.stroke();ctx.fillStyle='rgba(107,114,128,0.7)';ctx.font='9px DM Mono,monospace';ctx.fillText(Math.round(yMin+range*t),0,y+3);});
+  const _gridCol=getComputedStyle(document.documentElement).getPropertyValue('--border').trim()||'rgba(200,210,220,0.3)';
+  ctx.strokeStyle=_gridCol+'88';ctx.lineWidth=1;
+  [0.25,0.5,0.75,1].forEach(t=>{const y=pad.top+h*(1-t);ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(pad.left+w,y);ctx.stroke();ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--muted').trim()||'#6b7280';ctx.font='9px DM Mono,monospace';ctx.fillText(Math.round(yMin+range*t),0,y+3);});
   const grad=ctx.createLinearGradient(0,pad.top,0,pad.top+h);grad.addColorStop(0,color+'40');grad.addColorStop(1,'transparent');
   if(data.length>1){ctx.beginPath();ctx.moveTo(toX(0),toY(data[0]));data.forEach((v,i)=>{if(i>0)ctx.lineTo(toX(i),toY(v));});ctx.lineTo(toX(data.length-1),pad.top+h);ctx.lineTo(toX(0),pad.top+h);ctx.closePath();ctx.fillStyle=grad;ctx.fill();}
   ctx.beginPath();ctx.strokeStyle=color;ctx.lineWidth=2;ctx.lineJoin='round';
   data.forEach((v,i)=>{if(i===0)ctx.moveTo(toX(i),toY(v));else ctx.lineTo(toX(i),toY(v));});ctx.stroke();
-  data.forEach((v,i)=>{ctx.beginPath();ctx.arc(toX(i),toY(v),3,0,Math.PI*2);ctx.fillStyle=color;ctx.fill();ctx.strokeStyle='#0d0f14';ctx.lineWidth=1.5;ctx.stroke();});
-  ctx.fillStyle='rgba(107,114,128,0.7)';ctx.font='9px DM Mono,monospace';ctx.textAlign='center';
+  data.forEach((v,i)=>{ctx.beginPath();ctx.arc(toX(i),toY(v),3,0,Math.PI*2);ctx.fillStyle=color;ctx.fill();ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()||'#0d0f14';ctx.lineWidth=1.5;ctx.stroke();});
+  ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--muted').trim()||'#6b7280';ctx.font='9px DM Mono,monospace';ctx.textAlign='center';
   const step=Math.max(1,Math.floor(labels.length/5));
   labels.forEach((l,i)=>{if(i%step===0||i===labels.length-1)ctx.fillText(l,toX(i),H-6);});
 }
@@ -631,20 +1024,20 @@ function drawLineChart(id,labels,data,color,yMin,yMax){
 // ══════════════════════════════════════════
 function renderHistory(){
   const measures=DB.measures,cont=document.getElementById('historyList');
-  if(!measures.length){cont.innerHTML=`<div class="empty-state"><p>Aucune mesure enregistrée.</p></div>`;return;}
+  if(!measures.length){cont.innerHTML=`<div class="empty-state"><p>${t('history_empty')}</p></div>`;return;}
   cont.innerHTML=measures.map(m=>{
     const dz=depZone(m.dep),sz=spo2Zone(m.spo2),d=new Date(m.dt);
-    const dateStr=d.toLocaleDateString('fr-FR',{weekday:'short',day:'2-digit',month:'short'})+' '+d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+    const dateStr=d.toLocaleDateString(t('locale'),{weekday:'short',day:'2-digit',month:'short'})+' '+d.toLocaleTimeString(t('locale'),{hour:'2-digit',minute:'2-digit'});
     const depDetail=[m.dep1,m.dep2,m.dep3].filter(Boolean);
     return `<div class="history-item">
       <div style="flex:1">
         <div class="history-date">${dateStr}</div>
         <div class="history-vals">
-          <span class="history-chip zone-badge ${zoneClass(dz)}">DEP ${m.dep}${depDetail.length>1?' (moy.)':''}</span>
+          <span class="history-chip zone-badge ${zoneClass(dz)}">${t('db_dep_avg').split(' ')[0]} ${m.dep}${depDetail.length>1?t('dep_avg_suffix'):''}</span>
           <span class="history-chip zone-badge ${zoneClass(sz)}">SpO₂ ${m.spo2}%</span>
           <span class="history-chip" style="color:var(--accent)">💊 ${m.easy}</span>
         </div>
-        ${depDetail.length>1?`<div class="dep-measurements" style="margin-top:4px">Souffles : ${depDetail.join(' · ')}</div>`:''}
+        ${depDetail.length>1?`<div class="dep-measurements" style="margin-top:4px">${t('breaths_label')} : ${depDetail.join(' · ')}</div>`:''}
         ${m.comment?`<div class="history-comment">"${m.comment}"</div>`:''}
       </div>
       <div class="history-actions">
@@ -654,14 +1047,14 @@ function renderHistory(){
     </div>`;
   }).join('');
 }
-function deleteMeasure(id){if(!confirm('Supprimer cette mesure ?'))return;DB.measures=DB.measures.filter(m=>m.id!==id);driveAutoSync();renderHistory();}
+function deleteMeasure(id){if(!confirm(t('toast_deleted_confirm')))return;DB.measures=DB.measures.filter(m=>m.id!==id);driveAutoSync();renderHistory();}
 
 // ══════════════════════════════════════════
 //  PDF EXPORT
 // ══════════════════════════════════════════
 function exportPDF(){
-  const measures=DB.measures;if(!measures.length){showToast('Aucune donnée','error');return;}
-  if(!window.jspdf){showToast('Erreur: jsPDF non chargé','error');return;}
+  const measures=DB.measures;if(!measures.length){showToast(t('toast_pdf_no_data'),'error');return;}
+  if(!window.jspdf){showToast(t('toast_pdf_error'),'error');return;}
   _doExportPDF(measures);
 }
 async function _doExportPDF(measures){
@@ -671,10 +1064,10 @@ async function _doExportPDF(measures){
   doc.setFillColor(...dark);doc.rect(0,0,210,297,'F');
   doc.setFillColor(...blue);doc.rect(0,0,210,18,'F');
   doc.setTextColor(255,255,255);doc.setFontSize(13);doc.setFont('helvetica','bold');
-  doc.text('AsthmeTrack \u2014 Export des mesures',10,12);
+  doc.text(t('pdf_title'),10,12);
   doc.setFontSize(8);doc.setFont('helvetica','normal');
-  doc.text('Généré le '+new Date().toLocaleDateString('fr-FR')+' \u00e0 '+new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}),200,12,{align:'right'});
-  const cols=['Date','Heure','DEP','Souffles','Zone','SpO\u2082','Zone','Prises','Commentaire'];
+  doc.text(t('pdf_generated',new Date().toLocaleDateString(t('locale')),new Date().toLocaleTimeString(t('locale'),{hour:'2-digit',minute:'2-digit'})),200,12,{align:'right'});
+  const cols=t('pdf_cols');
   const widths=[22,16,18,22,20,14,20,14,44];
   let y=28;
   doc.setFillColor(30,34,45);doc.rect(8,y-5,194,7,'F');
@@ -695,7 +1088,7 @@ async function _doExportPDF(measures){
       zoneLabel(dz),
       (m.spo2||'-')+'%',
       m.spo2?zoneLabel(spo2Zone(m.spo2)):'-',
-      m.easy!=null?m.easy+' pr':'-',
+      m.easy!=null?m.easy+' '+t('prise_short'):'-',
       (m.comment||'').slice(0,30)
     ];
     if(idx%2===0){doc.setFillColor(...rowAlt);doc.rect(8,y-4,194,6,'F');}
@@ -711,7 +1104,7 @@ async function _doExportPDF(measures){
     y+=6;
   });
   doc.setTextColor(60,70,90);doc.setFontSize(7);
-  doc.text('AsthmeTrack \u2022 '+sorted.length+' mesures export\u00e9es',10,292);
+  doc.text(t('pdf_footer',sorted.length),10,292);
 
   // ── Page 2 : Graphes DEP et SpO₂ ──────────────────────────────────────
   const canvasDep = document.getElementById('chartDEP');
@@ -721,7 +1114,7 @@ async function _doExportPDF(measures){
     doc.setFillColor(...dark); doc.rect(0,0,210,297,'F');
     doc.setFillColor(...blue); doc.rect(0,0,210,12,'F');
     doc.setTextColor(255,255,255); doc.setFontSize(11); doc.setFont('helvetica','bold');
-    doc.text('Graphes — évolution sur 14 jours',10,9);
+    doc.text(t('pdf_charts_title'),10,9);
 
     let gy = 22;
     const chartW = 190, chartH = 55;
@@ -731,7 +1124,7 @@ async function _doExportPDF(measures){
         const imgDep = canvasDep.toDataURL('image/png');
         doc.setFillColor(30,34,45); doc.rect(8,gy-5,194,chartH+12,'F');
         doc.setTextColor(...blue); doc.setFontSize(8); doc.setFont('helvetica','bold');
-        doc.text('DEP (L/min)',10,gy);
+        doc.text(t('pdf_dep_label'),10,gy);
         doc.addImage(imgDep,'PNG',10,gy+3,chartW,chartH);
         gy += chartH + 18;
       } catch(e) { console.warn('PDF chart DEP error:', e); }
@@ -742,13 +1135,13 @@ async function _doExportPDF(measures){
         const imgSpo = canvasSpo.toDataURL('image/png');
         doc.setFillColor(30,34,45); doc.rect(8,gy-5,194,chartH+12,'F');
         doc.setTextColor(16,217,160); doc.setFontSize(8); doc.setFont('helvetica','bold');
-        doc.text('SpO₂ (%)',10,gy);
+        doc.text(t('pdf_spo2_label'),10,gy);
         doc.addImage(imgSpo,'PNG',10,gy+3,chartW,chartH);
       } catch(e) { console.warn('PDF chart SpO2 error:', e); }
     }
 
     doc.setTextColor(60,70,90); doc.setFontSize(7);
-    doc.text('Graphes générés depuis les 14 dernières mesures enregistrées',10,292);
+    doc.text(t('pdf_charts_footer'),10,292);
   }
   // ──────────────────────────────────────────────────────────────────────
 
@@ -775,12 +1168,12 @@ async function _doExportPDF(measures){
       }
     } catch(fsErr) {
       console.error('PDF Filesystem error:', fsErr);
-      showToast('Erreur sauvegarde: ' + (fsErr.message||'').slice(0,60), 'error');
+      showToast(t('pdf_save_error',(fsErr.message||'').slice(0,60)), 'error');
     }
   } else {
     doc.save(filename);
   }
-  showToast('✓ PDF généré');
+  showToast(t('toast_pdf_done'));
 }
 
 // ══════════════════════════════════════════
@@ -832,7 +1225,7 @@ async function connectDrive() {
   try {
     const SocialLogin = getSocialLogin();
     if (!SocialLogin) {
-      showToast('Plugin non disponible', 'error');
+      showToast(t('drive_plugin_unavailable'),'error');
       setSync(false);
       return;
     }
@@ -853,7 +1246,7 @@ async function connectDrive() {
     DB.driveUser = profile.email;
     DB.driveAvatar = profile.avatar;
     renderSettings();
-    showToast('✓ Google Drive connecté');
+    showToast(t('drive_connected_toast'));
     // Vérifie s'il existe une sauvegarde sur Drive sans écraser les données locales
     await _driveCheckAndPrompt();
   } catch(e) {
@@ -920,13 +1313,13 @@ async function _driveCheckAndPrompt() {
 
     if (!hasRemote && !hasLocal) {
       // Rien nulle part — rien à faire
-      showToast('Drive connecté — aucune sauvegarde existante');
+      showToast(t('drive_connected_no_backup'));
       return;
     }
 
     if (!hasRemote && hasLocal) {
       // Données locales seulement → propose de sauvegarder
-      if (confirm('Aucune sauvegarde sur Drive.\nSauvegarder vos données locales (' + DB.measures.length + ' mesures) ?')) {
+      if (confirm(t('drive_no_backup').replace('%n', DB.measures.length))) {
         await driveSyncUp();
       }
       return;
@@ -940,15 +1333,10 @@ async function _driveCheckAndPrompt() {
     }
 
     // Les deux existent → affiche un choix explicite
-    const modDate = new Date(sj.files[0].modifiedTime).toLocaleDateString('fr-FR', {
+    const modDate = new Date(sj.files[0].modifiedTime).toLocaleDateString(t('locale'), {
       day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
     });
-    const choice = confirm(
-      'Données locales : ' + DB.measures.length + ' mesures.\n' +
-      'Sauvegarde Drive : modifiée le ' + modDate + '.\n\n' +
-      'OK → Restaurer depuis Drive (écrase les données locales)\n' +
-      'Annuler → Sauvegarder les données locales sur Drive'
-    );
+    const choice = confirm(t('drive_conflict', DB.measures.length, modDate));
     DB.driveFileId = sj.files[0].id;
     if (choice) {
       await driveSyncDown();
@@ -963,7 +1351,7 @@ async function _driveCheckAndPrompt() {
 }
 
 async function disconnectDrive() {
-  if (!confirm('Déconnecter Google Drive ?')) return;
+  if (!confirm(t('drive_disconnect_confirm'))) return;
   try {
     const SocialLogin = getSocialLogin();
     if (SocialLogin) await SocialLogin.logout({ provider: 'google' });
@@ -972,11 +1360,11 @@ async function disconnectDrive() {
   SecureStore.remove('at_driveToken');
   SecureStore.remove('at_driveTokenExpiry');
   renderSettings();
-  showToast('✓ Déconnecté');
+  showToast(t('drive_disconnect_toast'));
 }
 
 async function driveSyncUp() {
-  if (!await ensureValidToken()) { showToast('Non connecté à Drive', 'error'); return; }
+  if (!await ensureValidToken()) { showToast(t('drive_not_connected'),'error'); return; }
   setSync(true);
   try {
     const data = JSON.stringify({ measures: DB.measures, bestDEP: DB.bestDEP, reminders: DB.reminders, version: 2 });
@@ -1013,7 +1401,7 @@ async function driveSyncUp() {
     }
     const j = await r.json();
     DB.driveFileId = j.id;
-    showToast('✓ Sauvegardé sur Drive');
+    showToast(t('drive_saved'));
   } catch(e) {
     console.error('driveSyncUp error:', e);
     showToast('Drive: ' + (e.message||JSON.stringify(e)).slice(0,80), 'error');
@@ -1022,7 +1410,7 @@ async function driveSyncUp() {
 }
 
 async function driveSyncDown() {
-  if (!await ensureValidToken()) { showToast('Non connecté à Drive', 'error'); return; }
+  if (!await ensureValidToken()) { showToast(t('drive_not_connected'),'error'); return; }
   setSync(true);
   try {
     const search = await fetch(
@@ -1035,7 +1423,7 @@ async function driveSyncDown() {
       throw new Error('API Drive ' + search.status + ' — ' + errText.slice(0,100));
     }
     const sj = await search.json();
-    if (!sj.files || !sj.files.length) { showToast('Aucune sauvegarde trouvée'); setSync(false); return; }
+    if (!sj.files || !sj.files.length) { showToast(t('drive_no_backup_found')); setSync(false); return; }
     DB.driveFileId = sj.files[0].id;
     const dl = await fetch(
       `https://www.googleapis.com/drive/v3/files/${DB.driveFileId}?alt=media`,
@@ -1045,7 +1433,7 @@ async function driveSyncDown() {
     if (d.measures) DB.measures = d.measures;
     if (d.bestDEP) DB.bestDEP = d.bestDEP;
     if (d.reminders) DB.reminders = d.reminders;
-    showToast('✓ Données restaurées depuis Drive');
+    showToast(t('drive_restored'));
     renderDashboard();
   } catch(e) { showToast('Erreur restauration Drive', 'error'); }
   finally { setSync(false); }
@@ -1075,9 +1463,11 @@ function exportJSON() {
   const a = document.createElement('a');
   a.href = url;
   a.download = 'asthmetrack_backup_' + new Date().toISOString().slice(0,10) + '.json';
+  a.style.display = 'none';
+  document.body.appendChild(a);
   a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 2000);
-  showToast('✓ Sauvegarde JSON téléchargée');
+  setTimeout(() => { URL.revokeObjectURL(url); document.body.removeChild(a); }, 2000);
+  showToast(t('toast_json_exported'));
 }
 
 function importJSON() {
@@ -1091,19 +1481,19 @@ function importJSON() {
       const text = await file.text();
       const data = JSON.parse(text);
       // Basic schema validation
-      if (!Array.isArray(data.measures)) throw new Error('Format invalide — champ "measures" manquant.');
+      if (!Array.isArray(data.measures)) throw new Error(t('toast_json_invalid'));
       const existing = DB.measures.length;
       if (existing > 0) {
-        if (!confirm(`Importer ${data.measures.length} mesures ?\nCela remplacera vos ${existing} mesures actuelles.`)) return;
+        if (!confirm(t('import_confirm', data.measures.length, existing))) return;
       }
       if (data.measures)  DB.measures = data.measures;
       if (data.bestDEP)   DB.bestDEP  = data.bestDEP;
       if (data.reminders) DB.reminders = data.reminders;
       renderDashboard();
-      showToast('✓ ' + data.measures.length + ' mesures importées');
+      showToast(t('toast_json_imported', data.measures.length));
       driveAutoSync();
     } catch(err) {
-      showToast('Erreur import : ' + (err.message||'fichier invalide').slice(0,60), 'error');
+      showToast(t('toast_json_import_err', (err.message||t('toast_json_invalid')).slice(0,60)), 'error');
     }
   };
   input.click();
@@ -1116,24 +1506,22 @@ function renderSettings(){
   const isConnected=!!DB.driveToken;
   document.getElementById('settingsContent').innerHTML=`
     <div class="card">
-      <div class="card-title">☁️ Google Drive</div>
+      <div class="card-title">${t('settings_drive_title')}</div>
       ${isConnected?`
         <div class="drive-connected">
           <div class="drive-avatar">${DB.driveAvatar?`<img src="${DB.driveAvatar}" style="width:40px;height:40px;border-radius:50%;object-fit:cover" onerror="this.style.display='none'"/>`:''}<span style="${DB.driveAvatar?'display:none':''}">👤</span></div>
           <div class="drive-info">
             <div class="drive-name">${DB.driveUser||'Compte Google'}</div>
-            <div class="drive-sub">✓ Connecté — sync auto activée</div>
+            <div class="drive-sub">${t('settings_drive_connected')}</div>
           </div>
         </div>
         <div class="drive-btns">
-          <button class="drive-btn upload" onclick="driveSyncUp()">⬆ Sauvegarder</button>
-          <button class="drive-btn download" onclick="driveSyncDown()">⬇ Restaurer</button>
-          <button class="drive-btn danger" onclick="disconnectDrive()">Déconnecter</button>
+          <button class="drive-btn upload" onclick="driveSyncUp()">${t('btn_drive_upload')}</button>
+          <button class="drive-btn download" onclick="driveSyncDown()">${t('btn_drive_download')}</button>
+          <button class="drive-btn danger" onclick="disconnectDrive()">${t('btn_drive_disconnect')}</button>
         </div>
       `:`
-        <p style="font-size:12px;color:var(--muted);margin-bottom:16px">
-          Sauvegardez vos données sur votre Google Drive personnel. Vos données n'appartiennent qu'à vous.
-        </p>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:16px">${t('settings_drive_desc')}</p>
         <button class="btn-google" onclick="connectDrive()">
           <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -1141,61 +1529,76 @@ function renderSettings(){
             <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
             <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
           </svg>
-          Se connecter avec Google
+          ${t('btn_google_signin')}
         </button>
       `}
     </div>
 
     <div class="card">
-      <div class="card-title">Calibration DEP</div>
-      <div class="field"><label>Votre meilleur DEP personnel (L/min)</label><input type="number" id="bestDEPInput" value="${DB.bestDEP}" min="100" max="900"/></div>
-      <button class="btn-primary" onclick="saveBestDEP()">Enregistrer</button>
+      <div class="card-title">${t('settings_dep_title')}</div>
+      <div class="field"><label>${t('settings_dep_label')}</label><input type="number" id="bestDEPInput" value="${DB.bestDEP}" min="100" max="900"/></div>
+      <button class="btn-primary" onclick="saveBestDEP()">${t('btn_save_dep')}</button>
     </div>
 
     <div class="card">
-      <div class="card-title">Rappels de prises</div>
+      <div class="card-title">${t('settings_reminders_title')}</div>
       <div id="reminderList"></div>
       <div class="add-reminder-form">
         <input type="time" id="reminderTime"/>
-        <input type="text" id="reminderLabel" placeholder="ex. Matin"/>
-        <button class="btn-secondary" onclick="addReminder()">+ Ajouter</button>
+        <input type="text" id="reminderLabel" placeholder="${t('reminder_ph_label')}"/>
+        <button class="btn-secondary" onclick="addReminder()">${t('btn_add_reminder')}</button>
       </div>
     </div>
 
     <div class="card">
-      <div class="card-title">Données</div>
-      <div class="setting-row"><div><div class="setting-label">Exporter PDF</div><div class="setting-sub">Rapport complet de vos mesures</div></div><button class="btn-secondary" onclick="exportPDF()">⬇ PDF</button></div>
-      <div class="setting-row"><div><div class="setting-label">Exporter JSON</div><div class="setting-sub">Sauvegarde brute — tous appareils</div></div><button class="btn-secondary" onclick="exportJSON()">⬇ JSON</button></div>
-      <div class="setting-row"><div><div class="setting-label">Importer JSON</div><div class="setting-sub">Restaurer depuis un fichier .json</div></div><button class="btn-secondary" onclick="importJSON()">⬆ Importer</button></div>
-      <div class="setting-row"><div><div class="setting-label">Supprimer tout</div><div class="setting-sub">Action irréversible</div></div><button class="btn-secondary" style="color:var(--red);border-color:var(--red)" onclick="clearAll()">Effacer</button></div>
+      <div class="card-title">${t('settings_appearance_title')}</div>
+      <div class="setting-row">
+        <div><div class="setting-label">${t('settings_theme_label')}</div></div>
+        <label class="toggle"><input type="checkbox" id="themeToggle" ${isDark()?'checked':''} onchange="applyTheme(this.checked);renderSettings()"/><span class="toggle-slider"></span></label>
+      </div>
+      <div class="setting-row">
+        <div><div class="setting-label">${t('settings_lang_label')}</div></div>
+        <div style="display:flex;gap:6px">
+          <button class="btn-secondary" style="${_lang==='fr'?'border-color:var(--accent);color:var(--accent)':''}" onclick="setLang('fr')">FR</button>
+          <button class="btn-secondary" style="${_lang==='en'?'border-color:var(--accent);color:var(--accent)':''}" onclick="setLang('en')">EN</button>
+        </div>
+      </div>
     </div>
 
     <div class="card">
-      <div class="card-title">Zones de référence</div>
-      <div class="setting-row"><span class="zone-badge zone-green">🟢 Verte</span><span style="font-size:12px;color:var(--muted)">DEP ≥ 80% · SpO₂ ≥ 95%</span></div>
-      <div class="setting-row"><span class="zone-badge zone-yellow">🟡 Jaune</span><span style="font-size:12px;color:var(--muted)">DEP 60–80% · SpO₂ 90–94%</span></div>
-      <div class="setting-row"><span class="zone-badge zone-red">🔴 Rouge</span><span style="font-size:12px;color:var(--muted)">DEP &lt; 60% · SpO₂ &lt; 90%</span></div>
+      <div class="card-title">${t('settings_data_title')}</div>
+      <div class="setting-row"><div><div class="setting-label">${t('settings_export_pdf_label')}</div><div class="setting-sub">${t('settings_export_pdf_sub')}</div></div><button class="btn-secondary" onclick="exportPDF()">${t('btn_export_pdf')}</button></div>
+      <div class="setting-row"><div><div class="setting-label">${t('settings_export_json_label')}</div><div class="setting-sub">${t('settings_export_json_sub')}</div></div><button class="btn-secondary" onclick="exportJSON()">${t('btn_export_json')}</button></div>
+      <div class="setting-row"><div><div class="setting-label">${t('settings_import_json_label')}</div><div class="setting-sub">${t('settings_import_json_sub')}</div></div><button class="btn-secondary" onclick="importJSON()">${t('btn_import_json')}</button></div>
+      <div class="setting-row"><div><div class="setting-label">${t('settings_clear_label')}</div><div class="setting-sub">${t('settings_clear_sub')}</div></div><button class="btn-secondary" style="color:var(--red);border-color:var(--red)" onclick="clearAll()">${t('btn_clear')}</button></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">${t('settings_zones_title')}</div>
+      <div class="setting-row"><span class="zone-badge zone-green">${t('zone_green')}</span><span style="font-size:12px;color:var(--muted)">${t('zone_green_desc')}</span></div>
+      <div class="setting-row"><span class="zone-badge zone-yellow">${t('zone_yellow')}</span><span style="font-size:12px;color:var(--muted)">${t('zone_yellow_desc')}</span></div>
+      <div class="setting-row"><span class="zone-badge zone-red">${t('zone_red')}</span><span style="font-size:12px;color:var(--muted)">${t('zone_red_desc')}</span></div>
     </div>
   `;
   renderReminderList();
 }
 
-function saveBestDEP(){const v=parseFloat(document.getElementById('bestDEPInput').value);if(!v||v<100||v>900){showToast('⚠️ Valeur invalide','error');return;}DB.bestDEP=v;showToast('✓ Meilleur DEP sauvegardé');}
-function clearAll(){if(!confirm('Effacer TOUTES les mesures ?'))return;DB.measures=[];showToast('✓ Données supprimées');}
+function saveBestDEP(){const v=parseFloat(document.getElementById('bestDEPInput').value);if(!v||v<100||v>900){showToast(t('toast_best_dep_invalid'),'error');return;}DB.bestDEP=v;showToast(t('toast_best_dep_saved'));}
+function clearAll(){if(!confirm(t('toast_clear_confirm')))return;DB.measures=[];showToast(t('toast_cleared'));}
 
 // ── REMINDERS ──
 let reminderTimers=[];
 function renderReminderList(){
   const list=document.getElementById('reminderList');if(!list)return;
   const rem=DB.reminders;
-  if(!rem.length){list.innerHTML=`<p style="color:var(--muted);font-size:12px;margin-bottom:10px">Aucun rappel configuré.</p>`;return;}
+  if(!rem.length){list.innerHTML=`<p style="color:var(--muted);font-size:12px;margin-bottom:10px">${t('reminders_empty')}</p>`;return;}
   list.innerHTML=rem.map((r,i)=>`<div class="reminder-item"><div class="reminder-info"><div class="reminder-time">${r.time}</div><div class="reminder-label-text">${r.label}</div></div><label class="toggle"><input type="checkbox" ${r.active?'checked':''} onchange="toggleReminder(${i})"/><span class="toggle-slider"></span></label><button class="reminder-del" onclick="deleteReminder(${i})">✕</button></div>`).join('');
 }
 function addReminder(){
-  const time=document.getElementById('reminderTime').value,label=document.getElementById('reminderLabel').value.trim()||'Rappel';
-  if(!time){showToast('⚠️ Choisir une heure','error');return;}
+  const time=document.getElementById('reminderTime').value,label=document.getElementById('reminderLabel').value.trim()||t('reminder_ph_label');
+  if(!time){showToast(t('toast_reminder_no_time'),'error');return;}
   const rem=DB.reminders;rem.push({time,label,active:true});DB.reminders=rem;
-  scheduleReminders();renderReminderList();showToast('✓ Rappel ajouté');
+  scheduleReminders();renderReminderList();showToast(t('toast_reminder_added'));
 }
 function toggleReminder(i){const rem=DB.reminders;rem[i].active=!rem[i].active;DB.reminders=rem;scheduleReminders();renderReminderList();if(currentPage==='dashboard')renderDashboard();}
 function deleteReminder(i){const rem=DB.reminders;rem.splice(i,1);DB.reminders=rem;scheduleReminders();renderReminderList();}
@@ -1242,6 +1645,10 @@ window.addEventListener('unhandledrejection', function(e) {
 
 document.addEventListener('DOMContentLoaded', async ()=>{
   await SecureStore.init(); // restore token from secure storage before first render
+  // Apply persisted theme & language immediately
+  applyTheme(isDark());
+  document.documentElement.lang = _lang;
+  renderStaticHTML();
   renderDashboard();
   // Demande la permission de notifications au démarrage
   if (!IS_CAPACITOR && typeof Notification !== 'undefined' && Notification.permission === 'default') {
