@@ -1456,18 +1456,42 @@ function checkOAuthRedirect() { /* plus utilisé — géré nativement par le pl
 // ══════════════════════════════════════════
 //  JSON EXPORT / IMPORT
 // ══════════════════════════════════════════
-function exportJSON() {
+async function exportJSON() {
   const payload = { measures: DB.measures, bestDEP: DB.bestDEP, reminders: DB.reminders, version: 2 };
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'asthmetrack_backup_' + new Date().toISOString().slice(0,10) + '.json';
-  a.style.display = 'none';
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => { URL.revokeObjectURL(url); document.body.removeChild(a); }, 2000);
-  showToast(t('toast_json_exported'));
+  const jsonStr = JSON.stringify(payload, null, 2);
+  const filename = 'asthmetrack_backup_' + new Date().toISOString().slice(0,10) + '.json';
+
+  if (IS_CAPACITOR) {
+    // Native: write to Documents via @capacitor/filesystem then share
+    try {
+      const Filesystem = window.Capacitor?.Plugins?.Filesystem;
+      const Share      = window.Capacitor?.Plugins?.Share;
+      if (!Filesystem) throw new Error('Plugin Filesystem unavailable — run npx cap sync');
+      // btoa requires a binary string; use encodeURIComponent round-trip for full UTF-8
+      const b64 = btoa(unescape(encodeURIComponent(jsonStr)));
+      await Filesystem.writeFile({ path: filename, data: b64, directory: 'DOCUMENTS', recursive: true });
+      showToast(t('toast_json_exported'));
+      if (Share) {
+        const uriResult = await Filesystem.getUri({ path: filename, directory: 'DOCUMENTS' });
+        await Share.share({ title: filename, url: uriResult.uri, dialogTitle: filename });
+      }
+    } catch (fsErr) {
+      console.error('JSON export error:', fsErr);
+      showToast(t('pdf_save_error', (fsErr.message || '').slice(0, 60)), 'error');
+    }
+  } else {
+    // Web: standard Blob download
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = filename;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); document.body.removeChild(a); }, 2000);
+    showToast(t('toast_json_exported'));
+  }
 }
 
 function importJSON() {
