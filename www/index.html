@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="theme-color" id="metaThemeColor" content="#0d0f14"/>
 <title>AsthmeTrack</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
 <style>
@@ -28,41 +29,44 @@
   }
   /* ── Light theme ────────────────────────────────────────────────────────── */
   html[data-theme="light"] {
-    --bg: #f4f6fb;
-    --surface: #ffffff;
-    --surface2: #edf0f7;
-    --border: #d1d9e6;
-    --text: #1a1d27;
-    --muted: #6b7280;
-    --accent: #2563eb;
-    --accent2: #7c3aed;
-    --green: #059669;
-    --yellow: #d97706;
-    --red: #dc2626;
-    --danger: #dc2626;
-    --green-dim: rgba(5,150,105,0.12);
-    --yellow-dim: rgba(217,119,6,0.12);
-    --red-dim: rgba(220,38,38,0.12);
+    /* Warm off-white palette — easier on the eyes than pure white */
+    --bg: #f0ede8;          /* warm parchment, not cold grey */
+    --surface: #faf8f5;     /* warm near-white card background */
+    --surface2: #ede9e3;    /* slightly deeper warm tint for inputs */
+    --border: #c9c2b8;      /* warm mid-grey border */
+    --text: #2c2926;        /* warm dark brown, not pure black */
+    --muted: #7a7068;       /* warm muted text */
+    --accent: #1d5fba;      /* slightly deeper blue, good contrast on warm bg */
+    --accent2: #6d28d9;
+    --green: #0f7a5a;       /* deeper green for contrast on warm bg */
+    --yellow: #b45309;
+    --red: #b91c1c;
+    --danger: #b91c1c;
+    --green-dim: rgba(15,122,90,0.10);
+    --yellow-dim: rgba(180,83,9,0.10);
+    --red-dim: rgba(185,28,28,0.10);
   }
   html[data-theme="light"] body { background: var(--bg); }
-  html[data-theme="light"] .app-header { background: rgba(244,246,251,0.92); }
-  html[data-theme="light"] .nav { background: rgba(244,246,251,0.97); }
-  html[data-theme="light"] .modal-overlay { background: rgba(0,0,0,.4); }
-  html[data-theme="light"] .btn-google { background: #fff; }
+  html[data-theme="light"] { --header-bg: rgba(240,237,232,0.93); --nav-bg: rgba(240,237,232,0.97); }
+  html[data-theme="light"] .app-header { background: var(--header-bg); }
+  html[data-theme="light"] .nav { background: var(--nav-bg); }
+  html[data-theme="light"] .modal-overlay { background: rgba(0,0,0,.35); }
+  html[data-theme="light"] .modal { background: var(--surface); }
+  html[data-theme="light"] .btn-google { background: var(--surface); }
   html[data-theme="light"] canvas { filter: none; }
   /* chart gridlines readable on light bg */
 
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   body { background: var(--bg); color: var(--text); font-family: var(--font-mono); font-size: 16px; min-height: 100vh; overflow-x: hidden; }
 
-  .app-header { position: sticky; top: 0; z-index: 100; background: rgba(13,15,20,0.92); backdrop-filter: blur(16px); border-bottom: 1px solid var(--border); padding: 16px 20px 12px; display: flex; align-items: center; justify-content: space-between; }
+  .app-header { position: sticky; top: 0; z-index: 100; background: var(--header-bg, rgba(13,15,20,0.92)); backdrop-filter: blur(16px); border-bottom: 1px solid var(--border); padding: 16px 20px 12px; display: flex; align-items: center; justify-content: space-between; }
   .app-header h1 { font-family: var(--font-head); font-size: 20px; font-weight: 800; letter-spacing: -0.5px; background: linear-gradient(135deg, var(--accent), var(--green)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
   .header-right { display: flex; align-items: center; gap: 8px; }
   .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite; }
   .status-dot.syncing { background: var(--yellow); box-shadow: 0 0 8px var(--yellow); }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
 
-  .nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 100; background: rgba(13,15,20,0.95); backdrop-filter: blur(20px); border-top: 1px solid var(--border); display: flex; padding-bottom: env(safe-area-inset-bottom, 0); }
+  .nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 100; background: var(--nav-bg, rgba(13,15,20,0.95)); backdrop-filter: blur(20px); border-top: 1px solid var(--border); display: flex; padding-bottom: env(safe-area-inset-bottom, 0); }
   .nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 10px 4px; background: none; border: none; color: var(--muted); cursor: pointer; transition: color .2s; font-family: var(--font-mono); font-size: 12px; }
   .nav-btn svg { width: 22px; height: 22px; stroke-width: 1.5; }
   .nav-btn.active { color: var(--accent); }
@@ -71,6 +75,8 @@
   .page { display: none; padding: 20px 16px 100px; animation: fadeIn .25s ease; }
   .page.active { display: block; }
   @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
+  @keyframes shake { 0%,100%{transform:none} 20%,60%{transform:translateX(-4px)} 40%,80%{transform:translateX(4px)} }
+  .field-error input, .field-error textarea { border-color: var(--danger) !important; animation: shake .35s ease; }
 
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; margin-bottom: 14px; }
   .card-title { font-family: var(--font-head); font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); margin-bottom: 14px; }
@@ -139,7 +145,7 @@
   .history-chip { font-size: 14px; padding: 3px 9px; border-radius: 20px; background: var(--surface); border: 1px solid var(--border); }
   .history-comment { font-size: 14px; color: var(--muted); margin-top: 6px; font-style: italic; }
   .history-actions { display: flex; gap: 6px; flex-shrink: 0; }
-  .icon-action-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 17px; padding: 2px; transition: color .2s; }
+  .icon-action-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 17px; padding: 10px; margin: -8px; transition: color .2s; }
   .icon-action-btn.edit:hover { color: var(--accent); }
   .icon-action-btn.del:hover { color: var(--red); }
 
@@ -187,7 +193,7 @@
   .modal-title { font-family: var(--font-head); font-size: 18px; font-weight: 700; }
   .modal-close { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--muted); width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; }
 
-  .toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); background: var(--green); color: #000; padding: 10px 20px; border-radius: 30px; font-family: var(--font-head); font-size: 15px; font-weight: 700; z-index: 999; opacity: 0; transition: opacity .3s; pointer-events: none; white-space: nowrap; }
+  .toast { position: fixed; bottom: calc(env(safe-area-inset-bottom, 0px) + 90px); left: 50%; transform: translateX(-50%); background: var(--green); color: #000; padding: 10px 20px; border-radius: 30px; font-family: var(--font-head); font-size: 15px; font-weight: 700; z-index: 999; opacity: 0; transition: opacity .3s; pointer-events: none; white-space: nowrap; }
   .toast.show { opacity: 1; }
   .toast.error { background: var(--red); color: #fff; }
 
@@ -212,13 +218,13 @@
     border-color: var(--danger) !important;
     box-shadow: 0 0 0 2px rgba(240,79,79,.25);
   }
-  .dep-field:has(input.dep-invalid)::after {
-    content: '⚠ Hors limites (50–900)';
-    display: block;
+  .dep-hint {
     font-size: 13px;
     color: var(--danger);
     margin-top: 4px;
+    display: none;
   }
+  .dep-hint.visible { display: block; }
 
   /* Champ SpO2 hors limites */
   .spo2-field input.spo2-invalid,
@@ -235,7 +241,7 @@
   }
   .spo2-hint.visible { display: block; }
 </style>
-  <script src="jspdf.umd.min.js"></script>
+  <script src="jspdf.umd.min.js" defer></script>
 </head>
 <body>
 
@@ -253,17 +259,17 @@
 <!-- SAISIE -->
 <div id="page-saisie" class="page">
   <div class="card">
-    <div class="card-title">Nouvelle mesure</div>
+    <div class="card-title" data-i18n="new_measure">Nouvelle mesure</div>
     <div class="field">
-      <label>Date &amp; heure</label>
+      <label data-i18n="label_datetime">Date &amp; heure</label>
       <input type="datetime-local" id="inputDatetime"/>
     </div>
     <div class="field">
-      <label>DEP — Moyenne sur 3 souffles (L/min)</label>
+      <label data-i18n="label_dep">DEP — Moyenne sur 3 souffles (L/min)</label>
       <div class="dep-inputs">
-        <div class="dep-field"><label>Souffle 1</label><input type="number" id="dep1" placeholder="—" min="50" max="900" oninput="updateDepAvg()"/></div>
-        <div class="dep-field"><label>Souffle 2</label><input type="number" id="dep2" placeholder="—" min="50" max="900" oninput="updateDepAvg()"/></div>
-        <div class="dep-field"><label>Souffle 3</label><input type="number" id="dep3" placeholder="—" min="50" max="900" oninput="updateDepAvg()"/></div>
+        <div class="dep-field"><label>Souffle 1</label><input type="number" id="dep1" placeholder="—" min="50" max="900" autocomplete="off" oninput="updateDepAvg()"/><span class="dep-hint" id="depHint1"></span></div>
+        <div class="dep-field"><label>Souffle 2</label><input type="number" id="dep2" placeholder="—" min="50" max="900" autocomplete="off" oninput="updateDepAvg()"/><span class="dep-hint" id="depHint2"></span></div>
+        <div class="dep-field"><label>Souffle 3</label><input type="number" id="dep3" placeholder="—" min="50" max="900" autocomplete="off" oninput="updateDepAvg()"/><span class="dep-hint" id="depHint3"></span></div>
       </div>
       <div class="dep-avg-display" id="depAvgDisplay" style="display:none">
         <span class="dep-avg-label">Moyenne calculée</span>
@@ -271,11 +277,11 @@
       </div>
     </div>
     <div class="field">
-      <label>SpO₂ — Oxymétrie de pouls (%)</label>
-      <div class="spo2-wrap"><input type="number" id="inputSpO2" placeholder="ex. 97" min="70" max="100" oninput="updateSpo2Display(this)"/><span class="spo2-hint" id="spo2Hint">⚠ Hors limites (70–100)</span></div>
+      <label data-i18n="label_spo2">SpO₂ — Oxymétrie de pouls (%)</label>
+      <div class="spo2-wrap"><input type="number" id="inputSpO2" placeholder="ex. 97" min="70" max="100" autocomplete="off" oninput="updateSpo2Display(this)"/><span class="spo2-hint" id="spo2Hint">⚠ Hors limites (70–100)</span></div>
     </div>
     <div class="field">
-      <label>Prises Easyhaler aujourd'hui</label>
+      <label data-i18n="label_easyhaler">Prises Easyhaler aujourd'hui</label>
       <div class="easyhaler-btns">
         <button class="easyh-btn" data-val="0" onclick="selectEasy(0)">0</button>
         <button class="easyh-btn" data-val="1" onclick="selectEasy(1)">1</button>
@@ -286,17 +292,17 @@
       </div>
     </div>
     <div class="field">
-      <label>Commentaire (facultatif)</label>
+      <label data-i18n="label_comment">Commentaire (facultatif)</label>
       <textarea id="inputComment" placeholder="Symptômes, contexte, météo…"></textarea>
     </div>
-    <button class="btn-primary" onclick="saveMeasure()">Enregistrer la mesure</button>
+    <button class="btn-primary" data-i18n="btn_save_measure" onclick="saveMeasure()">Enregistrer la mesure</button>
   </div>
 </div>
 
 <!-- HISTORIQUE -->
 <div id="page-historique" class="page">
   <div class="section-header">
-    <div class="card-title" style="margin:0">Historique</div>
+    <div class="card-title" style="margin:0" data-i18n="history_title">Historique</div>
     <button class="icon-btn" onclick="exportPDF()" title="Exporter PDF">
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
     </button>
@@ -330,23 +336,23 @@
 <div class="modal-overlay" id="editModal">
   <div class="modal">
     <div class="modal-header">
-      <div class="modal-title">Modifier la mesure</div>
+      <div class="modal-title" data-i18n="edit_title">Modifier la mesure</div>
       <button class="modal-close" onclick="closeEditModal()">✕</button>
     </div>
-    <div class="field"><label>Date &amp; heure</label><input type="datetime-local" id="editDatetime"/></div>
+    <div class="field"><label data-i18n="label_datetime">Date &amp; heure</label><input type="datetime-local" id="editDatetime"/></div>
     <div class="field">
-      <label>DEP — 3 souffles (L/min)</label>
+      <label data-i18n="label_dep_3">DEP — 3 souffles (L/min)</label>
       <div class="dep-inputs">
-        <div class="dep-field"><label>Souffle 1</label><input type="number" id="editDep1" placeholder="—" min="50" max="900" oninput="updateEditDepAvg()"/></div>
-        <div class="dep-field"><label>Souffle 2</label><input type="number" id="editDep2" placeholder="—" min="50" max="900" oninput="updateEditDepAvg()"/></div>
-        <div class="dep-field"><label>Souffle 3</label><input type="number" id="editDep3" placeholder="—" min="50" max="900" oninput="updateEditDepAvg()"/></div>
+        <div class="dep-field"><label>Souffle 1</label><input type="number" id="editDep1" placeholder="—" min="50" max="900" autocomplete="off" oninput="updateEditDepAvg()"/><span class="dep-hint" id="editDepHint1"></span></div>
+        <div class="dep-field"><label>Souffle 2</label><input type="number" id="editDep2" placeholder="—" min="50" max="900" autocomplete="off" oninput="updateEditDepAvg()"/><span class="dep-hint" id="editDepHint2"></span></div>
+        <div class="dep-field"><label>Souffle 3</label><input type="number" id="editDep3" placeholder="—" min="50" max="900" autocomplete="off" oninput="updateEditDepAvg()"/><span class="dep-hint" id="editDepHint3"></span></div>
       </div>
       <div class="dep-avg-display" id="editDepAvgDisplay" style="display:none">
         <span class="dep-avg-label">Moyenne calculée</span>
         <span class="dep-avg-value" id="editDepAvgValue">—</span>
       </div>
     </div>
-    <div class="field"><label>SpO₂ (%)</label><div class="spo2-wrap"><input type="number" id="editSpO2" min="70" max="100" oninput="updateSpo2Display(this)"/><span class="spo2-hint" id="editSpo2Hint">⚠ Hors limites (70–100)</span></div></div>
+    <div class="field"><label>SpO₂ (%)</label><div class="spo2-wrap"><input type="number" id="editSpO2" min="70" max="100" autocomplete="off" oninput="updateSpo2Display(this)"/><span class="spo2-hint" id="editSpo2Hint">⚠ Hors limites (70–100)</span></div></div>
     <div class="field">
       <label>Prises Easyhaler</label>
       <div class="easyhaler-btns" id="editEasyBtns">
@@ -459,6 +465,7 @@ const LANG = {
     label_avg_calc: 'Moyenne calculée',
     label_spo2: 'SpO₂ — Oxymétrie de pouls (%)',
     label_spo2_ph: 'ex. 97',
+    dep_hint: '⚠ Hors limites (50–900)',
     spo2_hint: '⚠ Hors limites (70–100)',
     dep_hint: '⚠ Hors limites (50–900)',
     label_easyhaler: "Prises Easyhaler aujourd'hui",
@@ -583,6 +590,7 @@ const LANG = {
     label_avg_calc: 'Calculated average',
     label_spo2: 'SpO₂ — Pulse oximetry (%)',
     label_spo2_ph: 'e.g. 97',
+    dep_hint: '⚠ Out of range (50–900)',
     spo2_hint: '⚠ Out of range (70–100)',
     dep_hint: '⚠ Out of range (50–900)',
     label_easyhaler: 'Easyhaler doses today',
@@ -690,6 +698,7 @@ const LANG = {
 
 // Active language — reads from localStorage, defaults to 'fr'
 let _lang = localStorage.getItem('at_lang') || 'fr';
+document.documentElement.lang = _lang; // set immediately, before any render
 function t(key, ...args) {
   const v = LANG[_lang]?.[key] ?? LANG['fr'][key];
   return (typeof v === 'function') ? v(...args) : (v ?? key);
@@ -718,6 +727,9 @@ function _rerender() {
 function applyTheme(dark) {
   document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
   localStorage.setItem('at_theme', dark ? 'dark' : 'light');
+  // Keep browser chrome in sync (Android status bar, iOS Safari bar)
+  const meta = document.getElementById('metaThemeColor');
+  if (meta) meta.content = dark ? '#0d0f14' : '#f0ede8';
 }
 function isDark() { return localStorage.getItem('at_theme') !== 'light'; }
 // Apply immediately to avoid flash
@@ -746,6 +758,12 @@ function renderNav() {
 }
 
 function renderSaisieLabels() {
+  // 1. Handle data-i18n attributes (simple text substitution, no args)
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    const val = LANG[_lang]?.[key] ?? LANG['fr'][key];
+    if (val && typeof val === 'string') el.textContent = val;
+  });
   // Use a helper that skips null elements silently
   const set = (sel, txt) => { const el = document.querySelector(sel); if (el) el.textContent = txt; };
 
@@ -859,16 +877,14 @@ function updateSpo2Display(el){
 function updateDepAvg(){
   const avg=calcDepAvg(''),d=document.getElementById('depAvgDisplay'),v=document.getElementById('depAvgValue');
   if(avg!==null){d.style.display='flex';v.textContent=avg+' L/min';}else d.style.display='none';
-  // Signale visuellement chaque champ hors limites en temps réel
   [1,2,3].forEach(n=>{
     const el=document.getElementById('dep'+n);
-    if(!el||el.value==='')return el&&el.classList.remove('dep-invalid');
+    const hint=document.getElementById('depHint'+n);
+    if(!el||el.value===''){el&&el.classList.remove('dep-invalid');if(hint)hint.classList.remove('visible');return;}
     const v2=parseFloat(el.value);
-    if(!isNaN(v2)&&(v2<50||v2>900)){
-      el.classList.add('dep-invalid');
-    }else{
-      el.classList.remove('dep-invalid');
-    }
+    const bad=!isNaN(v2)&&(v2<50||v2>900);
+    el.classList.toggle('dep-invalid',bad);
+    if(hint){hint.textContent=t('dep_hint');hint.classList.toggle('visible',bad);}
   });
 }
 function updateEditDepAvg(){
@@ -876,13 +892,12 @@ function updateEditDepAvg(){
   if(avg!==null){d.style.display='flex';v.textContent=avg+' L/min';}else d.style.display='none';
   [1,2,3].forEach(n=>{
     const el=document.getElementById('editDep'+n);
-    if(!el||el.value==='')return el&&el.classList.remove('dep-invalid');
+    const hint=document.getElementById('editDepHint'+n);
+    if(!el||el.value===''){el&&el.classList.remove('dep-invalid');if(hint)hint.classList.remove('visible');return;}
     const v2=parseFloat(el.value);
-    if(!isNaN(v2)&&(v2<50||v2>900)){
-      el.classList.add('dep-invalid');
-    }else{
-      el.classList.remove('dep-invalid');
-    }
+    const bad=!isNaN(v2)&&(v2<50||v2>900);
+    el.classList.toggle('dep-invalid',bad);
+    if(hint){hint.textContent=t('dep_hint');hint.classList.toggle('visible',bad);}
   });
 }
 
@@ -908,8 +923,8 @@ function saveMeasure(){
   const dep=calcDepAvgWithWarn(''),spo2=parseFloat(document.getElementById('inputSpO2').value),dt=document.getElementById('inputDatetime').value,comment=document.getElementById('inputComment').value.trim();
   const dep1=parseFloat(document.getElementById('dep1').value)||null,dep2=parseFloat(document.getElementById('dep2').value)||null,dep3=parseFloat(document.getElementById('dep3').value)||null;
   if(!dt){showToast(t('err_date'),'error');return;}
-  if(!dep){showToast(t('err_no_dep'),'error');return;}
-  if(!spo2||spo2<70||spo2>100){showToast(t('err_spo2'),'error');return;}
+  if(!dep){showToast(t('err_no_dep'),'error');_flashFieldError('dep1');return;}
+  if(!spo2||spo2<70||spo2>100){showToast(t('err_spo2'),'error');_flashFieldError('inputSpO2');return;}
   if(selectedEasy===null){showToast(t('err_easy'),'error');return;}
   const measures=DB.measures;
   measures.unshift({id:Date.now(),dt,dep,dep1,dep2,dep3,spo2,easy:selectedEasy,comment});
@@ -936,13 +951,28 @@ function openEditModal(id){
   document.querySelectorAll('#editEasyBtns .easyh-btn').forEach(b=>b.classList.toggle('selected',parseInt(b.dataset.val)===m.easy));
   document.getElementById('editModal').classList.add('open');
 }
-function closeEditModal(){document.getElementById('editModal').classList.remove('open');editingId=null;}
+function closeEditModal(){
+  document.getElementById('editModal').classList.remove('open');
+  editingId=null;
+  // Clear any lingering field-error highlights
+  document.querySelectorAll('#editModal .field-error').forEach(f=>f.classList.remove('field-error'));
+}
+function _flashFieldError(inputId){
+  const el=document.getElementById(inputId);
+  if(!el)return;
+  const field=el.closest('.field');
+  if(!field)return;
+  field.classList.remove('field-error'); // reset to retrigger animation
+  void field.offsetWidth;               // force reflow
+  field.classList.add('field-error');
+  setTimeout(()=>field.classList.remove('field-error'),2000);
+}
 function selectEditEasy(n){selectedEditEasy=n;document.querySelectorAll('#editEasyBtns .easyh-btn').forEach(b=>b.classList.toggle('selected',parseInt(b.dataset.val)===n));}
 function saveEdit(){
   const dep=calcDepAvgWithWarn('edit'),spo2=parseFloat(document.getElementById('editSpO2').value),dt=document.getElementById('editDatetime').value,comment=document.getElementById('editComment').value.trim();
   const dep1=parseFloat(document.getElementById('editDep1').value)||null,dep2=parseFloat(document.getElementById('editDep2').value)||null,dep3=parseFloat(document.getElementById('editDep3').value)||null;
-  if(!dep){showToast(t('err_no_dep'),'error');return;}
-  if(!spo2||spo2<70||spo2>100){showToast(t('err_spo2'),'error');return;}
+  if(!dep){showToast(t('err_no_dep'),'error');_flashFieldError('editDep1');return;}
+  if(!spo2||spo2<70||spo2>100){showToast(t('err_spo2'),'error');_flashFieldError('editSpO2');return;}
   if(selectedEditEasy===null){showToast(t('err_easy'),'error');return;}
   DB.measures=DB.measures.map(m=>m.id!==editingId?m:{...m,dt,dep,dep1,dep2,dep3,spo2,easy:selectedEditEasy,comment});
   closeEditModal();showToast(t('toast_edited'));driveAutoSync();
