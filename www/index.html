@@ -4,6 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="theme-color" id="metaThemeColor" content="#0d0f14"/>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' capacitor:; script-src 'self' 'unsafe-inline' capacitor:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://www.googleapis.com https://accounts.google.com https://api.anthropic.com capacitor:; frame-src 'none'; object-src 'none'"/>
 <title>AsthmeTrack</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
 <style>
@@ -208,6 +209,37 @@
 
   .reminder-badge { font-size: 13px; padding: 4px 10px; background: rgba(79,156,249,.1); border: 1px solid rgba(79,156,249,.3); border-radius: 20px; color: var(--accent); margin-right: 6px; margin-bottom: 6px; display: inline-block; }
 
+  /* ── Crisis banner ── */
+  .crisis-banner { background: var(--red-dim); border: 1px solid var(--red); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 14px; display: flex; align-items: flex-start; gap: 12px; }
+  .crisis-banner-icon { font-size: 22px; flex-shrink: 0; }
+  .crisis-banner-text { flex: 1; }
+  .crisis-banner-title { font-family: var(--font-head); font-size: 15px; font-weight: 700; color: var(--red); margin-bottom: 4px; }
+  .crisis-banner-sub { font-size: 13px; color: var(--text); }
+
+  /* ── Trend arrows ── */
+  .trend-up   { color: var(--green); font-size: 18px; margin-left: 4px; }
+  .trend-down { color: var(--red);   font-size: 18px; margin-left: 4px; }
+  .trend-flat { color: var(--muted); font-size: 18px; margin-left: 4px; }
+
+  /* ── Offline banner ── */
+  .offline-banner { position: fixed; top: 0; left: 0; right: 0; z-index: 500; background: var(--yellow); color: #000; text-align: center; font-size: 13px; font-weight: 600; padding: 6px; transform: translateY(-100%); transition: transform .3s; }
+  .offline-banner.visible { transform: translateY(0); }
+
+  /* ── History empty-state with CTA ── */
+  .empty-state-cta { margin-top: 14px; display: inline-block; padding: 10px 20px; background: var(--accent); color: #fff; border-radius: 10px; font-family: var(--font-head); font-size: 14px; font-weight: 700; cursor: pointer; border: none; }
+
+  /* ── History swipe (touch) ── */
+  .history-item { position: relative; overflow: hidden; transition: transform .2s; }
+  .history-swipe-bg { position: absolute; right: 0; top: 0; bottom: 0; width: 80px; background: var(--red); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 22px; border-radius: 0 12px 12px 0; pointer-events: none; }
+
+  /* ── Profile / DEP reference modal ── */
+  .profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+  .profile-result { background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-top: 12px; text-align: center; }
+  .profile-result-value { font-family: var(--font-head); font-size: 32px; font-weight: 800; color: var(--accent); }
+  .profile-result-label { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .profile-result-range { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .profile-formula-note { font-size: 11px; color: var(--muted); margin-top: 8px; font-style: italic; }
+
   ::-webkit-scrollbar { width: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
@@ -244,6 +276,7 @@
   <script src="jspdf.umd.min.js" defer></script>
 </head>
 <body>
+<div class="offline-banner" id="offlineBanner"></div>
 
 <header class="app-header">
   <h1>AsthmeTrack</h1>
@@ -332,6 +365,37 @@
   </button>
 </nav>
 
+
+<!-- PROFILE MODAL -->
+<div class="modal-overlay" id="profileModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" data-i18n="profile_title">Profil &amp; DEP théorique</div>
+      <button class="modal-close" onclick="closeProfileModal()">✕</button>
+    </div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:16px" data-i18n="profile_age_sub">Valeurs de référence pour adultes (18–70 ans)</p>
+    <div class="profile-grid">
+      <div class="field">
+        <label data-i18n="profile_sex">Sexe</label>
+        <select id="profileSex" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:var(--font-mono);font-size:16px;padding:12px 14px;outline:none" onchange="calcPredictedDEP()">
+          <option value="M" data-i18n="profile_male">Homme</option>
+          <option value="F" data-i18n="profile_female">Femme</option>
+        </select>
+      </div>
+      <div class="field">
+        <label data-i18n="profile_age">Âge (ans)</label>
+        <input type="number" id="profileAge" min="18" max="70" placeholder="ex. 35" autocomplete="off" oninput="calcPredictedDEP()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:var(--font-mono);font-size:16px;padding:12px 14px;outline:none"/>
+      </div>
+      <div class="field" style="grid-column:1/-1">
+        <label data-i18n="profile_height">Taille (cm)</label>
+        <input type="number" id="profileHeight" min="100" max="220" placeholder="ex. 170" autocomplete="off" oninput="calcPredictedDEP()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:var(--font-mono);font-size:16px;padding:12px 14px;outline:none"/>
+      </div>
+    </div>
+    <div class="profile-result" id="profileResult">
+      <div class="profile-result-label" style="color:var(--muted)" data-i18n="profile_no_result">Remplissez le profil pour calculer</div>
+    </div>
+  </div>
+</div>
 <!-- MODAL EDIT -->
 <div class="modal-overlay" id="editModal">
   <div class="modal">
@@ -378,6 +442,8 @@
 //  (type "Application Android" ou "Application de bureau")
 //  Les données vont dans le Drive de CHAQUE utilisateur — pas le vôtre.
 // ══════════════════════════════════════════
+// GOOGLE_CLIENT_ID is injected at build time via: sed -i "s/__GOOGLE_CLIENT_ID__/$GOOGLE_CLIENT_ID/g" www/index.html
+// Never commit a real Client ID here. Keep __GOOGLE_CLIENT_ID__ as the placeholder.
 const GOOGLE_CLIENT_ID = '__GOOGLE_CLIENT_ID__';
 const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.email';
 const GDRIVE_FILENAME = 'asthmetrack_data.json';
@@ -393,6 +459,8 @@ const DB = {
   set bestDEP(v) { localStorage.setItem('at_bestDEP',v); },
   get reminders() { try{return JSON.parse(localStorage.getItem('at_reminders')||'[]');}catch(e){return[];} },
   set reminders(v) { localStorage.setItem('at_reminders',JSON.stringify(v)); },
+  get profile() { try{return JSON.parse(localStorage.getItem('at_profile')||'{}');}catch(e){return {};} },
+  set profile(v) { localStorage.setItem('at_profile',JSON.stringify(v)); },
   // ── token fields stay in localStorage for synchronous access ──────────
   // On Capacitor the token is ALSO persisted in CapacitorPreferences (secure
   // storage backed by EncryptedSharedPreferences on Android / Keychain on iOS).
@@ -542,6 +610,7 @@ const LANG = {
     err_spo2: '⚠️ SpO₂ invalide',
     err_easy: '⚠️ Choisir nbre de prises',
     err_date: '⚠️ Date manquante',
+    err_date_future: '⚠️ La date ne peut pas être dans le futur',
     err_dep_range: '⚠️ Valeur DEP hors limites (50–900) ignorée',
     dose_singular: 'prise', dose_plural: 'prises',
     // drive
@@ -568,6 +637,36 @@ const LANG = {
     pdf_charts_footer: 'Graphes générés depuis les 14 dernières mesures enregistrées',
     pdf_save_error: (m) => `Erreur sauvegarde: ${m}`,
     locale: 'fr-FR',
+    // Profile / predicted DEP
+    profile_title: 'Profil & DEP théorique',
+    profile_sex: 'Sexe',
+    profile_male: 'Homme',
+    profile_female: 'Femme',
+    profile_age: 'Âge (ans)',
+    profile_height: 'Taille (cm)',
+    profile_calc: 'Calculer',
+    profile_result_label: 'DEP théorique',
+    profile_result_range: (lo, hi) => `Plage normale : ${lo}–${hi} L/min`,
+    profile_formula_note: 'Formule ECSC/Quanjer — valeurs de référence adultes',
+    profile_set_best: 'Utiliser comme meilleur DEP',
+    profile_age_sub: 'Valeurs de référence pour adultes (18–70 ans)',
+    profile_no_result: 'Remplissez le profil pour calculer',
+    // crisis
+    crisis_title: '⚠️ Zone Rouge — plusieurs mesures consécutives',
+    crisis_sub: 'Votre DEP est en zone rouge depuis plusieurs mesures. Consultez votre médecin si les symptômes persistent.',
+    // trend
+    trend_label: '7j',
+    // offline
+    offline_msg: 'Hors ligne — la synchronisation Drive reprendra automatiquement',
+    // csv
+    settings_export_csv_label: 'Exporter CSV',
+    settings_export_csv_sub: 'Tableur — Excel, Numbers…',
+    btn_export_csv: '⬇ CSV',
+    toast_csv_exported: '✓ CSV téléchargé',
+    // settings profile link
+    settings_profile_label: 'DEP théorique',
+    settings_profile_sub: 'Calculer selon votre profil',
+    btn_profile_open: 'Calculer',
   },
   en: {
     // nav
@@ -667,6 +766,7 @@ const LANG = {
     err_spo2: '⚠️ Invalid SpO₂',
     err_easy: '⚠️ Choose number of doses',
     err_date: '⚠️ Date missing',
+    err_date_future: '⚠️ Date cannot be in the future',
     err_dep_range: '⚠️ PEF value out of range (50–900) ignored',
     dose_singular: 'dose', dose_plural: 'doses',
     // drive
@@ -693,6 +793,36 @@ const LANG = {
     pdf_charts_footer: 'Charts generated from the last 14 recorded measurements',
     pdf_save_error: (m) => `Save error: ${m}`,
     locale: 'en-GB',
+    // Profile / predicted DEP
+    profile_title: 'Profile & predicted PEF',
+    profile_sex: 'Sex',
+    profile_male: 'Male',
+    profile_female: 'Female',
+    profile_age: 'Age (years)',
+    profile_height: 'Height (cm)',
+    profile_calc: 'Calculate',
+    profile_result_label: 'Predicted PEF',
+    profile_result_range: (lo, hi) => `Normal range: ${lo}–${hi} L/min`,
+    profile_formula_note: 'ECSC/Quanjer reference equations — adults',
+    profile_set_best: 'Use as personal best PEF',
+    profile_age_sub: 'Reference values for adults (18–70 years)',
+    profile_no_result: 'Fill in your profile to calculate',
+    // crisis
+    crisis_title: '⚠️ Red Zone — multiple consecutive readings',
+    crisis_sub: 'Your PEF has been in the red zone for several readings. Contact your doctor if symptoms persist.',
+    // trend
+    trend_label: '7d',
+    // offline
+    offline_msg: 'Offline — Drive sync will resume automatically',
+    // csv
+    settings_export_csv_label: 'Export CSV',
+    settings_export_csv_sub: 'Spreadsheet — Excel, Numbers…',
+    btn_export_csv: '⬇ CSV',
+    toast_csv_exported: '✓ CSV downloaded',
+    // settings profile link
+    settings_profile_label: 'Predicted PEF',
+    settings_profile_sub: 'Calculate from your profile',
+    btn_profile_open: 'Calculate',
   },
 };
 
@@ -713,6 +843,7 @@ function _rerender() {
   // Re-render every visible section and static HTML strings
   renderNav();
   renderStaticHTML();
+  _translateProfileModal();
   const page = currentPage;
   if (page === 'dashboard')   renderDashboard();
   if (page === 'historique')  renderHistory();
@@ -824,6 +955,200 @@ function renderSaisieLabels() {
 function renderStaticHTML() {
   renderNav();
   renderSaisieLabels();
+}
+
+
+// ══════════════════════════════════════════
+//  PREDICTED DEP  (ECSC / Quanjer reference equations)
+//  Ref: Quanjer PH et al. Eur Respir J 1993;6(Suppl 16):5–40
+//  Male:   PEF = (((height_m * 5.48) + 1.58) - (age * 0.041)) × 60
+//  Female: PEF = (((height_m * 3.72) + 2.24) - (age * 0.030)) × 60
+//  Normal range ±20% around predicted value.
+// ══════════════════════════════════════════
+function predictedDEP(sex, age, heightCm) {
+  const h = heightCm / 100;
+  let pef;
+  if (sex === 'M') pef = (((h * 5.48) + 1.58) - (age * 0.041)) * 60;
+  else             pef = (((h * 3.72) + 2.24) - (age * 0.030)) * 60;
+  return Math.round(pef);
+}
+
+function openProfileModal() {
+  const p = DB.profile;
+  document.getElementById('profileSex').value    = p.sex    || 'M';
+  document.getElementById('profileAge').value    = p.age    || '';
+  document.getElementById('profileHeight').value = p.height || '';
+  calcPredictedDEP(); // show result if already filled
+  document.getElementById('profileModal').classList.add('open');
+}
+function closeProfileModal() { document.getElementById('profileModal').classList.remove('open'); }
+
+function _translateProfileModal() {
+  const set = (sel, key) => { const el = document.querySelector(sel); if (el) el.textContent = t(key); };
+  set('#profileModal .modal-title', 'profile_title');
+  set('#profileModal [data-i18n="profile_age_sub"]', 'profile_age_sub');
+  const mOpt = document.querySelector('#profileSex option[value="M"]');
+  const fOpt = document.querySelector('#profileSex option[value="F"]');
+  if (mOpt) mOpt.textContent = t('profile_male');
+  if (fOpt) fOpt.textContent = t('profile_female');
+  set('#profileModal label[data-i18n="profile_sex"]', 'profile_sex');
+  set('#profileModal label[data-i18n="profile_age"]', 'profile_age');
+  set('#profileModal label[data-i18n="profile_height"]', 'profile_height');
+  calcPredictedDEP(); // refresh result text in new language
+}
+
+function calcPredictedDEP() {
+  const sex    = document.getElementById('profileSex').value;
+  const age    = parseInt(document.getElementById('profileAge').value);
+  const height = parseInt(document.getElementById('profileHeight').value);
+  // Save profile regardless
+  DB.profile = { sex, age: age||null, height: height||null };
+
+  const res = document.getElementById('profileResult');
+  if (!age || !height || age < 18 || age > 70 || height < 100 || height > 220) {
+    res.innerHTML = `<div class="profile-result-label" style="color:var(--muted)">${t('profile_no_result')}</div>`;
+    return;
+  }
+  const pred = predictedDEP(sex, age, height);
+  const lo   = Math.round(pred * 0.80);
+  const hi   = Math.round(pred * 1.20);
+  res.innerHTML = `
+    <div class="profile-result-value">${pred}</div>
+    <div class="profile-result-label">${t('profile_result_label')} (L/min)</div>
+    <div class="profile-result-range">${t('profile_result_range', lo, hi)}</div>
+    <div class="profile-formula-note">${t('profile_formula_note')}</div>
+    <button class="btn-secondary" style="margin-top:14px;width:100%" onclick="useProfileDEP(${pred})">${t('profile_set_best')}</button>
+  `;
+}
+
+function useProfileDEP(val) {
+  DB.bestDEP = val;
+  showToast(t('toast_best_dep_saved'));
+  closeProfileModal();
+  if (currentPage === 'settings') renderSettings();
+  if (currentPage === 'dashboard') renderDashboard();
+}
+
+// ══════════════════════════════════════════
+//  TREND  (compare last 7 days vs previous 7 days)
+// ══════════════════════════════════════════
+function calcTrend(measures, field) {
+  const now   = Date.now();
+  const day7  = 7 * 24 * 3600 * 1000;
+  const last7 = measures.filter(m => (now - new Date(m.dt)) < day7);
+  const prev7 = measures.filter(m => { const age = now - new Date(m.dt); return age >= day7 && age < 2*day7; });
+  if (!last7.length || !prev7.length) return null;
+  const avg = arr => arr.reduce((s,m) => s + m[field], 0) / arr.length;
+  const diff = avg(last7) - avg(prev7);
+  const pct  = Math.abs(diff) / avg(prev7) * 100;
+  if (pct < 3) return 'flat';
+  return diff > 0 ? 'up' : 'down';
+}
+
+function trendArrow(trend, field) {
+  if (!trend) return '';
+  const isGoodUp = field === 'dep' || field === 'spo2'; // higher = better for both
+  const cls = trend === 'flat' ? 'trend-flat'
+            : (trend === 'up') === isGoodUp ? 'trend-up' : 'trend-down';
+  const sym = trend === 'flat' ? '→' : trend === 'up' ? '↑' : '↓';
+  return `<span class="${cls}" title="${t('trend_label')}">${sym}</span>`;
+}
+
+// ══════════════════════════════════════════
+//  CRISIS DETECTION
+//  Fires when last N consecutive readings are red-zone DEP
+// ══════════════════════════════════════════
+const CRISIS_THRESHOLD = 2; // consecutive red-zone readings to trigger banner
+
+function isCrisis(measures) {
+  if (measures.length < CRISIS_THRESHOLD) return false;
+  return measures.slice(0, CRISIS_THRESHOLD).every(m => depZone(m.dep) === 'red');
+}
+
+// ══════════════════════════════════════════
+//  CSV EXPORT
+// ══════════════════════════════════════════
+async function exportCSV() {
+  const measures = DB.measures;
+  if (!measures.length) { showToast(t('toast_pdf_no_data'), 'error'); return; }
+  const cols = t('pdf_cols'); // reuse same column names
+  const rows = [...measures]
+    .sort((a, b) => new Date(a.dt) - new Date(b.dt))
+    .map(m => {
+      const d = new Date(m.dt);
+      const date = d.toLocaleDateString(t('locale'));
+      const time = d.toLocaleTimeString(t('locale'), { hour: '2-digit', minute: '2-digit' });
+      const blows = [m.dep1, m.dep2, m.dep3].filter(Boolean).join(' / ');
+      return [
+        date, time, m.dep, blows,
+        zoneLabel(depZone(m.dep)).replace(/🟢|🟡|🔴/g, '').trim(),
+        m.spo2,
+        zoneLabel(spo2Zone(m.spo2)).replace(/🟢|🟡|🔴/g, '').trim(),
+        m.easy != null ? m.easy : '',
+        (m.comment || '').replace(/"/g, '""'),
+      ].map(v => `"${v}"`).join(',');
+    });
+
+  const csv   = [cols.map(c => `"${c}"`).join(','), ...rows].join('\r\n');
+  const fname = 'asthmetrack_' + new Date().toISOString().slice(0, 10) + '.csv';
+
+  if (IS_CAPACITOR) {
+    try {
+      const Filesystem = window.Capacitor?.Plugins?.Filesystem;
+      const Share      = window.Capacitor?.Plugins?.Share;
+      if (!Filesystem) throw new Error('Filesystem plugin unavailable');
+      const b64 = btoa(unescape(encodeURIComponent(csv)));
+      await Filesystem.writeFile({ path: fname, data: b64, directory: 'DOCUMENTS', recursive: true });
+      showToast(t('toast_csv_exported'));
+      if (Share) {
+        const uri = await Filesystem.getUri({ path: fname, directory: 'DOCUMENTS' });
+        await Share.share({ title: fname, url: uri.uri });
+      }
+    } catch (e) {
+      showToast(t('pdf_save_error', (e.message||'').slice(0,60)), 'error');
+    }
+  } else {
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }); // BOM for Excel
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = fname; a.style.display = 'none';
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); document.body.removeChild(a); }, 2000);
+    showToast(t('toast_csv_exported'));
+  }
+}
+
+// ══════════════════════════════════════════
+//  OFFLINE DETECTION
+// ══════════════════════════════════════════
+function updateOfflineBanner() {
+  const banner = document.getElementById('offlineBanner');
+  if (!banner) return;
+  if (navigator.onLine) banner.classList.remove('visible');
+  else { banner.textContent = t('offline_msg'); banner.classList.add('visible'); }
+}
+
+// ══════════════════════════════════════════
+//  HISTORY SWIPE-TO-DELETE  (touch)
+// ══════════════════════════════════════════
+let _swipeEl=null,_swipeStartX=0,_swipeId=null;
+function _initSwipe(el, id) {
+  el.addEventListener('touchstart', e => {
+    _swipeEl=el; _swipeStartX=e.touches[0].clientX; _swipeId=id;
+  }, {passive:true});
+  el.addEventListener('touchmove', e => {
+    if (_swipeEl!==el) return;
+    const dx = e.touches[0].clientX - _swipeStartX;
+    if (dx < 0) el.style.transform = `translateX(${Math.max(dx,-80)}px)`;
+  }, {passive:true});
+  el.addEventListener('touchend', () => {
+    if (_swipeEl!==el) return;
+    const m = el.style.transform.match(/-?\d+/);
+    const dx = m ? parseInt(m[0]) : 0;
+    if (dx <= -60) { el.style.transform=''; deleteMeasure(_swipeId); }
+    else { el.style.transform=''; }
+    _swipeEl=null;
+  });
 }
 
 // ══════════════════════════════════════════
@@ -971,6 +1296,8 @@ function selectEditEasy(n){selectedEditEasy=n;document.querySelectorAll('#editEa
 function saveEdit(){
   const dep=calcDepAvgWithWarn('edit'),spo2=parseFloat(document.getElementById('editSpO2').value),dt=document.getElementById('editDatetime').value,comment=document.getElementById('editComment').value.trim();
   const dep1=parseFloat(document.getElementById('editDep1').value)||null,dep2=parseFloat(document.getElementById('editDep2').value)||null,dep3=parseFloat(document.getElementById('editDep3').value)||null;
+  if(!dt){showToast(t('err_date'),'error');_flashFieldError('editDatetime');return;}
+  if(new Date(dt)>new Date()){showToast(t('err_date_future')||'⚠️ Date dans le futur','error');_flashFieldError('editDatetime');return;}
   if(!dep){showToast(t('err_no_dep'),'error');_flashFieldError('editDep1');return;}
   if(!spo2||spo2<70||spo2>100){showToast(t('err_spo2'),'error');_flashFieldError('editSpO2');return;}
   if(selectedEditEasy===null){showToast(t('err_easy'),'error');return;}
@@ -994,21 +1321,25 @@ function renderDashboard(){
   const recent=[...measures].sort((a,b)=>new Date(a.dt)-new Date(b.dt)).slice(-14);
   const labels=recent.map(m=>{const d=new Date(m.dt);return d.getDate()+'/'+(d.getMonth()+1);});
   const activeRem=DB.reminders.filter(r=>r.active);
+  const depTrend  = calcTrend(measures, 'dep');
+  const spo2Trend = calcTrend(measures, 'spo2');
+  const crisis    = isCrisis(measures);
   cont.innerHTML=`
+    ${crisis?`<div class="crisis-banner"><div class="crisis-banner-icon">🚨</div><div class="crisis-banner-text"><div class="crisis-banner-title">${t('crisis_title')}</div><div class="crisis-banner-sub">${t('crisis_sub')}</div></div></div>`:''}
     ${activeRem.length?`<div class="card"><div class="card-title">${t('db_active_reminders')}</div><div>${activeRem.map(r=>`<span class="reminder-badge">🔔 ${r.time} — ${r.label}</span>`).join('')}</div></div>`:''}
     <div class="card">
       <div class="card-title">${t('db_last_measure')} — ${new Date(last.dt).toLocaleDateString(t('locale'),{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</div>
       <div class="metrics-grid">
         <div class="metric-box ${dz}">
           <div class="metric-label">${t('db_dep_avg')}</div>
-          <div class="metric-value">${last.dep}</div>
+          <div class="metric-value">${last.dep}${trendArrow(depTrend,'dep')}</div>
           <div class="metric-unit">L/min</div>
           <div class="metric-pct">${depPct}% ${t('db_best_pct')}</div>
           ${depDetail.length>1?`<div class="dep-measurements">${depDetail.join(' · ')}</div>`:''}
         </div>
         <div class="metric-box ${sz}">
           <div class="metric-label">SpO₂</div>
-          <div class="metric-value">${last.spo2}</div>
+          <div class="metric-value">${last.spo2}${trendArrow(spo2Trend,'spo2')}</div>
           <div class="metric-unit">%</div>
         </div>
       </div>
@@ -1054,12 +1385,15 @@ function drawLineChart(id,labels,data,color,yMin,yMax){
 // ══════════════════════════════════════════
 function renderHistory(){
   const measures=DB.measures,cont=document.getElementById('historyList');
-  if(!measures.length){cont.innerHTML=`<div class="empty-state"><p>${t('history_empty')}</p></div>`;return;}
-  cont.innerHTML=measures.map(m=>{
+  if(!measures.length){cont.innerHTML=`<div class="empty-state"><p>${t('history_empty')}</p><button class="empty-state-cta" onclick="showPage('saisie',document.querySelectorAll('.nav-btn')[1])">${t('btn_save_measure')}</button></div>`;return;}
+  cont.innerHTML=''; // built imperatively below to enable swipe init
+  measures.forEach(m=>{
     const dz=depZone(m.dep),sz=spo2Zone(m.spo2),d=new Date(m.dt);
     const dateStr=d.toLocaleDateString(t('locale'),{weekday:'short',day:'2-digit',month:'short'})+' '+d.toLocaleTimeString(t('locale'),{hour:'2-digit',minute:'2-digit'});
     const depDetail=[m.dep1,m.dep2,m.dep3].filter(Boolean);
-    return `<div class="history-item">
+    const wrapper=document.createElement('div');
+    wrapper.innerHTML=`<div class="history-item">
+      <div class="history-swipe-bg">🗑</div>
       <div style="flex:1">
         <div class="history-date">${dateStr}</div>
         <div class="history-vals">
@@ -1075,7 +1409,10 @@ function renderHistory(){
         <button class="icon-action-btn del" onclick="deleteMeasure(${m.id})">✕</button>
       </div>
     </div>`;
-  }).join('');
+    const item = wrapper.firstElementChild;
+    _initSwipe(item, m.id);
+    cont.appendChild(item);
+  });
 }
 function deleteMeasure(id){if(!confirm(t('toast_deleted_confirm')))return;DB.measures=DB.measures.filter(m=>m.id!==id);driveAutoSync();renderHistory();}
 
@@ -1397,7 +1734,7 @@ async function driveSyncUp() {
   if (!await ensureValidToken()) { showToast(t('drive_not_connected'),'error'); return; }
   setSync(true);
   try {
-    const data = JSON.stringify({ measures: DB.measures, bestDEP: DB.bestDEP, reminders: DB.reminders, version: 2 });
+    const data = JSON.stringify({ measures: DB.measures, bestDEP: DB.bestDEP, reminders: DB.reminders, profile: DB.profile, version: 2 });
     const isUpdate = !!DB.driveFileId;
     const url = isUpdate
       // PATCH : mise à jour — pas de parents dans le metadata (erreur 403 sinon)
@@ -1460,9 +1797,10 @@ async function driveSyncDown() {
       { headers: { Authorization: 'Bearer ' + DB.driveToken } }
     );
     const d = await dl.json();
-    if (d.measures) DB.measures = d.measures;
-    if (d.bestDEP) DB.bestDEP = d.bestDEP;
+    if (d.measures)  DB.measures  = d.measures;
+    if (d.bestDEP)   DB.bestDEP   = d.bestDEP;
     if (d.reminders) DB.reminders = d.reminders;
+    if (d.profile)   DB.profile   = d.profile;
     showToast(t('drive_restored'));
     renderDashboard();
   } catch(e) { showToast('Erreur restauration Drive', 'error'); }
@@ -1487,7 +1825,7 @@ function checkOAuthRedirect() { /* plus utilisé — géré nativement par le pl
 //  JSON EXPORT / IMPORT
 // ══════════════════════════════════════════
 async function exportJSON() {
-  const payload = { measures: DB.measures, bestDEP: DB.bestDEP, reminders: DB.reminders, version: 2 };
+  const payload = { measures: DB.measures, bestDEP: DB.bestDEP, reminders: DB.reminders, profile: DB.profile, version: 2 };
   const jsonStr = JSON.stringify(payload, null, 2);
   const filename = 'asthmetrack_backup_' + new Date().toISOString().slice(0,10) + '.json';
 
@@ -1540,9 +1878,10 @@ function importJSON() {
       if (existing > 0) {
         if (!confirm(t('import_confirm', data.measures.length, existing))) return;
       }
-      if (data.measures)  DB.measures = data.measures;
-      if (data.bestDEP)   DB.bestDEP  = data.bestDEP;
+      if (data.measures)  DB.measures  = data.measures;
+      if (data.bestDEP)   DB.bestDEP   = data.bestDEP;
       if (data.reminders) DB.reminders = data.reminders;
+      if (data.profile)   DB.profile   = data.profile;
       renderDashboard();
       showToast(t('toast_json_imported', data.measures.length));
       driveAutoSync();
@@ -1590,7 +1929,11 @@ function renderSettings(){
 
     <div class="card">
       <div class="card-title">${t('settings_dep_title')}</div>
-      <div class="field"><label>${t('settings_dep_label')}</label><input type="number" id="bestDEPInput" value="${DB.bestDEP}" min="100" max="900"/></div>
+      <div class="setting-row">
+        <div><div class="setting-label">${t('settings_profile_label')}</div><div class="setting-sub">${t('settings_profile_sub')}</div></div>
+        <button class="btn-secondary" onclick="openProfileModal()">${t('btn_profile_open')}</button>
+      </div>
+      <div class="field" style="margin-top:12px"><label>${t('settings_dep_label')}</label><input type="number" id="bestDEPInput" value="${DB.bestDEP}" min="100" max="900"/></div>
       <button class="btn-primary" onclick="saveBestDEP()">${t('btn_save_dep')}</button>
     </div>
 
@@ -1624,6 +1967,7 @@ function renderSettings(){
       <div class="setting-row"><div><div class="setting-label">${t('settings_export_pdf_label')}</div><div class="setting-sub">${t('settings_export_pdf_sub')}</div></div><button class="btn-secondary" onclick="exportPDF()">${t('btn_export_pdf')}</button></div>
       <div class="setting-row"><div><div class="setting-label">${t('settings_export_json_label')}</div><div class="setting-sub">${t('settings_export_json_sub')}</div></div><button class="btn-secondary" onclick="exportJSON()">${t('btn_export_json')}</button></div>
       <div class="setting-row"><div><div class="setting-label">${t('settings_import_json_label')}</div><div class="setting-sub">${t('settings_import_json_sub')}</div></div><button class="btn-secondary" onclick="importJSON()">${t('btn_import_json')}</button></div>
+      <div class="setting-row"><div><div class="setting-label">${t('settings_export_csv_label')}</div><div class="setting-sub">${t('settings_export_csv_sub')}</div></div><button class="btn-secondary" onclick="exportCSV()">${t('btn_export_csv')}</button></div>
       <div class="setting-row"><div><div class="setting-label">${t('settings_clear_label')}</div><div class="setting-sub">${t('settings_clear_sub')}</div></div><button class="btn-secondary" style="color:var(--red);border-color:var(--red)" onclick="clearAll()">${t('btn_clear')}</button></div>
     </div>
 
@@ -1698,11 +2042,16 @@ window.addEventListener('unhandledrejection', function(e) {
 });
 
 document.addEventListener('DOMContentLoaded', async ()=>{
-  await SecureStore.init(); // restore token from secure storage before first render
-  // Apply persisted theme & language immediately
+  await SecureStore.init();
   applyTheme(isDark());
   document.documentElement.lang = _lang;
   renderStaticHTML();
+  // Offline detection
+  updateOfflineBanner();
+  window.addEventListener('online',  updateOfflineBanner);
+  window.addEventListener('offline', updateOfflineBanner);
+  // Profile modal close on backdrop click
+  document.getElementById('profileModal').addEventListener('click', function(e){ if(e.target===this) closeProfileModal(); });
   renderDashboard();
   // Demande la permission de notifications au démarrage
   if (!IS_CAPACITOR && typeof Notification !== 'undefined' && Notification.permission === 'default') {
