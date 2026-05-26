@@ -6,7 +6,10 @@
 <meta name="theme-color" id="metaThemeColor" content="#0d0f14"/>
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' capacitor:; script-src 'self' 'unsafe-inline' capacitor:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://www.googleapis.com https://accounts.google.com https://api.anthropic.com capacitor:; frame-src 'none'; object-src 'none'"/>
 <title>AsthmeTrack</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<!-- Syne: heading font (no system equivalent, ~18 KB) -->
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<!-- DM Mono: loaded only when custom font preference is active (see applyFont) -->
+<link id="dmMonoLink" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet" disabled/>
 <style>
   :root {
     --bg: #0d0f14;
@@ -26,7 +29,7 @@
     --red-dim: rgba(240,79,79,0.12);
     --radius: 14px;
     --font-head: 'Syne', sans-serif;
-    --font-mono: 'DM Mono', monospace;
+    --font-mono: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'Courier New', monospace; /* system stack — overridden to DM Mono when custom font pref is on */
   }
   /* ── Light theme ────────────────────────────────────────────────────────── */
   html[data-theme="light"] {
@@ -584,6 +587,9 @@ const LANG = {
     settings_appearance_title: 'Apparence',
     settings_theme_label: 'Thème sombre',
     settings_lang_label: 'Langue / Language',
+    settings_font_label: 'Police de caractères',
+    settings_font_system: 'Système',
+    settings_font_custom: 'DM Mono',
     settings_zones_title: 'Zones de référence',
     zone_green_desc: 'DEP ≥ 80% · SpO₂ ≥ 95%',
     zone_yellow_desc: 'DEP 60–80% · SpO₂ 90–94%',
@@ -740,6 +746,9 @@ const LANG = {
     settings_appearance_title: 'Appearance',
     settings_theme_label: 'Dark theme',
     settings_lang_label: 'Langue / Language',
+    settings_font_label: 'Font',
+    settings_font_system: 'System',
+    settings_font_custom: 'DM Mono',
     settings_zones_title: 'Reference zones',
     zone_green_desc: 'PEF ≥ 80% · SpO₂ ≥ 95%',
     zone_yellow_desc: 'PEF 60–80% · SpO₂ 90–94%',
@@ -844,6 +853,8 @@ function _rerender() {
   renderNav();
   renderStaticHTML();
   _translateProfileModal();
+  // Re-apply font so CSS var stays in sync after hot rerender
+  applyFont(isCustomFont());
   const page = currentPage;
   if (page === 'dashboard')   renderDashboard();
   if (page === 'historique')  renderHistory();
@@ -858,13 +869,31 @@ function _rerender() {
 function applyTheme(dark) {
   document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
   localStorage.setItem('at_theme', dark ? 'dark' : 'light');
-  // Keep browser chrome in sync (Android status bar, iOS Safari bar)
   const meta = document.getElementById('metaThemeColor');
   if (meta) meta.content = dark ? '#0d0f14' : '#f0ede8';
 }
 function isDark() { return localStorage.getItem('at_theme') !== 'light'; }
-// Apply immediately to avoid flash
+
+// ── Font preference ──────────────────────────────────────────────────────────
+// 'system' (default) → system mono stack, no DM Mono network request
+// 'custom'           → loads DM Mono from Google Fonts
+const SYSTEM_MONO  = "ui-monospace,'Cascadia Code','Source Code Pro',Menlo,Consolas,'Courier New',monospace";
+const CUSTOM_MONO  = "'DM Mono',ui-monospace,monospace";
+
+function isCustomFont() { return localStorage.getItem('at_font') === 'custom'; }
+
+function applyFont(custom) {
+  localStorage.setItem('at_font', custom ? 'custom' : 'system');
+  const link = document.getElementById('dmMonoLink');
+  if (link) link.disabled = !custom;
+  document.documentElement.style.setProperty(
+    '--font-mono', custom ? CUSTOM_MONO : SYSTEM_MONO
+  );
+}
+
+// Apply immediately — before any render — to prevent flash
 applyTheme(isDark());
+applyFont(isCustomFont());
 
 // ══════════════════════════════════════════
 //  ZONES
@@ -1369,7 +1398,7 @@ function drawLineChart(id,labels,data,color,yMin,yMax){
   ctx.clearRect(0,0,W,H);if(!data.length)return;
   const _gridCol=getComputedStyle(document.documentElement).getPropertyValue('--border').trim()||'rgba(200,210,220,0.3)';
   ctx.strokeStyle=_gridCol+'88';ctx.lineWidth=1;
-  [0.25,0.5,0.75,1].forEach(t=>{const y=pad.top+h*(1-t);ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(pad.left+w,y);ctx.stroke();ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--muted').trim()||'#6b7280';ctx.font='9px DM Mono,monospace';ctx.fillText(Math.round(yMin+range*t),0,y+3);});
+  [0.25,0.5,0.75,1].forEach(t=>{const y=pad.top+h*(1-t);ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(pad.left+w,y);ctx.stroke();ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--muted').trim()||'#6b7280';ctx.font='9px ' + getComputedStyle(document.documentElement).getPropertyValue('--font-mono').trim();ctx.fillText(Math.round(yMin+range*t),0,y+3);});
   const grad=ctx.createLinearGradient(0,pad.top,0,pad.top+h);grad.addColorStop(0,color+'40');grad.addColorStop(1,'transparent');
   if(data.length>1){ctx.beginPath();ctx.moveTo(toX(0),toY(data[0]));data.forEach((v,i)=>{if(i>0)ctx.lineTo(toX(i),toY(v));});ctx.lineTo(toX(data.length-1),pad.top+h);ctx.lineTo(toX(0),pad.top+h);ctx.closePath();ctx.fillStyle=grad;ctx.fill();}
   ctx.beginPath();ctx.strokeStyle=color;ctx.lineWidth=2;ctx.lineJoin='round';
@@ -1960,6 +1989,13 @@ function renderSettings(){
           <button class="btn-secondary" style="${_lang==='en'?'border-color:var(--accent);color:var(--accent)':''}" onclick="setLang('en')">EN</button>
         </div>
       </div>
+      <div class="setting-row">
+        <div><div class="setting-label">${t('settings_font_label')}</div></div>
+        <div style="display:flex;gap:6px">
+          <button class="btn-secondary" style="${!isCustomFont()?'border-color:var(--accent);color:var(--accent)':''}" onclick="applyFont(false);renderSettings()">${t('settings_font_system')}</button>
+          <button class="btn-secondary" style="font-family:'DM Mono',monospace;${isCustomFont()?'border-color:var(--accent);color:var(--accent)':''}" onclick="applyFont(true);renderSettings()">${t('settings_font_custom')}</button>
+        </div>
+      </div>
     </div>
 
     <div class="card">
@@ -2044,6 +2080,7 @@ window.addEventListener('unhandledrejection', function(e) {
 document.addEventListener('DOMContentLoaded', async ()=>{
   await SecureStore.init();
   applyTheme(isDark());
+  applyFont(isCustomFont()); // re-apply after DOM ready (link element now accessible)
   document.documentElement.lang = _lang;
   renderStaticHTML();
   // Offline detection
