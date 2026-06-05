@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="theme-color" id="metaThemeColor" content="#0d0f14"/>
-<meta http-equiv="Content-Security-Policy" content="default-src 'self' capacitor:; script-src 'self' 'unsafe-inline' capacitor:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://www.googleapis.com https://accounts.google.com https://api.anthropic.com capacitor:; frame-src 'none'; object-src 'none'"/>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' capacitor:; script-src 'self' 'unsafe-inline' capacitor:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://www.googleapis.com https://accounts.google.com capacitor:; frame-src 'none'; object-src 'none'"/>
 <title>AsthmeTrack</title>
 <!-- Syne: heading font (no system equivalent, ~18 KB) -->
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
@@ -452,18 +452,32 @@ const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/drive.appdata https://www
 const GDRIVE_FILENAME = 'asthmetrack_data.json';
 const IS_CAPACITOR = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 
+
+// ══════════════════════════════════════════
+//  HTML ESCAPE HELPER  (FIX #1–3, #7–8 — XSS)
+//  Always call esc() before inserting user-controlled strings into innerHTML.
+// ══════════════════════════════════════════
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // ══════════════════════════════════════════
 //  DATA
 // ══════════════════════════════════════════
 const DB = {
   get measures() { try{return JSON.parse(localStorage.getItem('at_measures')||'[]');}catch(e){return[];} },
-  set measures(v) { localStorage.setItem('at_measures',JSON.stringify(v)); },
+  set measures(v) { try { localStorage.setItem('at_measures',JSON.stringify(v)); } catch(e) { console.error('DB.measures write failed',e); } },
   get bestDEP() { return parseFloat(localStorage.getItem('at_bestDEP')||'450'); },
-  set bestDEP(v) { localStorage.setItem('at_bestDEP',v); },
+  set bestDEP(v) { try { localStorage.setItem('at_bestDEP',v); } catch(e) { console.error('DB.bestDEP write failed',e); } },
   get reminders() { try{return JSON.parse(localStorage.getItem('at_reminders')||'[]');}catch(e){return[];} },
-  set reminders(v) { localStorage.setItem('at_reminders',JSON.stringify(v)); },
+  set reminders(v) { try { localStorage.setItem('at_reminders',JSON.stringify(v)); } catch(e) { console.error('DB.reminders write failed',e); } },
   get profile() { try{return JSON.parse(localStorage.getItem('at_profile')||'{}');}catch(e){return {};} },
-  set profile(v) { localStorage.setItem('at_profile',JSON.stringify(v)); },
+  set profile(v) { try { localStorage.setItem('at_profile',JSON.stringify(v)); } catch(e) { console.error('DB.profile write failed',e); } },
   // ── token fields stay in localStorage for synchronous access ──────────
   // On Capacitor the token is ALSO persisted in CapacitorPreferences (secure
   // storage backed by EncryptedSharedPreferences on Android / Keychain on iOS).
@@ -471,17 +485,20 @@ const DB = {
   // localStorage copy is the fast synchronous accessor used everywhere else.
   get driveToken() { return localStorage.getItem('at_driveToken')||null; },
   set driveToken(v) {
-    if (v) { localStorage.setItem('at_driveToken',v); SecureStore.save('at_driveToken',v); }
+    // FIX #9 — Do NOT write the OAuth token to plain localStorage.
+    // SecureStore.init() copies it to localStorage at boot for synchronous access.
+    if (v) { SecureStore.save('at_driveToken', v).then(() => localStorage.setItem('at_driveToken', v)); }
     else   { localStorage.removeItem('at_driveToken'); SecureStore.remove('at_driveToken'); }
   },
   get driveTokenExpiry() { return parseInt(localStorage.getItem('at_driveTokenExpiry')||'0'); },
-  set driveTokenExpiry(v) { localStorage.setItem('at_driveTokenExpiry',String(v)); SecureStore.save('at_driveTokenExpiry',String(v)); },
+  // FIX #9 — Write expiry to SecureStore first, then mirror to localStorage for sync reads.
+  set driveTokenExpiry(v) { SecureStore.save('at_driveTokenExpiry', String(v)).then(() => localStorage.setItem('at_driveTokenExpiry', String(v))); },
   get driveFileId() { return localStorage.getItem('at_driveFileId')||null; },
-  set driveFileId(v) { v?localStorage.setItem('at_driveFileId',v):localStorage.removeItem('at_driveFileId'); },
+  set driveFileId(v) { try { v?localStorage.setItem('at_driveFileId',v):localStorage.removeItem('at_driveFileId'); } catch(e) { console.error('DB.driveFileId write failed',e); } },
   get driveUser() { return localStorage.getItem('at_driveUser')||null; },
-  set driveUser(v) { v?localStorage.setItem('at_driveUser',v):localStorage.removeItem('at_driveUser'); },
+  set driveUser(v) { try { v?localStorage.setItem('at_driveUser',v):localStorage.removeItem('at_driveUser'); } catch(e) { console.error('DB.driveUser write failed',e); } },
   get driveAvatar() { return localStorage.getItem('at_driveAvatar')||null; },
-  set driveAvatar(v) { v?localStorage.setItem('at_driveAvatar',v):localStorage.removeItem('at_driveAvatar'); },
+  set driveAvatar(v) { try { v?localStorage.setItem('at_driveAvatar',v):localStorage.removeItem('at_driveAvatar'); } catch(e) { console.error('DB.driveAvatar write failed',e); } },
 };
 
 // ══════════════════════════════════════════
@@ -1035,19 +1052,22 @@ function calcPredictedDEP() {
 
   const res = document.getElementById('profileResult');
   if (!age || !height || age < 18 || age > 70 || height < 100 || height > 220) {
-    res.innerHTML = `<div class="profile-result-label" style="color:var(--muted)">${t('profile_no_result')}</div>`;
+    res.innerHTML = '';
+    const lbl=document.createElement('div');lbl.className='profile-result-label';lbl.style.color='var(--muted)';lbl.textContent=t('profile_no_result');
+    res.appendChild(lbl);
     return;
   }
   const pred = predictedDEP(sex, age, height);
   const lo   = Math.round(pred * 0.80);
   const hi   = Math.round(pred * 1.20);
-  res.innerHTML = `
-    <div class="profile-result-value">${pred}</div>
-    <div class="profile-result-label">${t('profile_result_label')} (L/min)</div>
-    <div class="profile-result-range">${t('profile_result_range', lo, hi)}</div>
-    <div class="profile-formula-note">${t('profile_formula_note')}</div>
-    <button class="btn-secondary" style="margin-top:14px;width:100%" onclick="useProfileDEP(${pred})">${t('profile_set_best')}</button>
-  `;
+  res.innerHTML = '';
+  const valEl=document.createElement('div');valEl.className='profile-result-value';valEl.textContent=pred;
+  const lblEl=document.createElement('div');lblEl.className='profile-result-label';lblEl.textContent=`${t('profile_result_label')} (L/min)`;
+  const rangeEl=document.createElement('div');rangeEl.className='profile-result-range';rangeEl.textContent=t('profile_result_range',lo,hi);
+  const noteEl=document.createElement('div');noteEl.className='profile-formula-note';noteEl.textContent=t('profile_formula_note');
+  const setBtn=document.createElement('button');setBtn.className='btn-secondary';setBtn.style.cssText='margin-top:14px;width:100%';
+  setBtn.textContent=t('profile_set_best');setBtn.addEventListener('click',()=>useProfileDEP(pred));
+  res.appendChild(valEl);res.appendChild(lblEl);res.appendChild(rangeEl);res.appendChild(noteEl);res.appendChild(setBtn);
 }
 
 function useProfileDEP(val) {
@@ -1277,6 +1297,7 @@ function saveMeasure(){
   const dep=calcDepAvgWithWarn(''),spo2=parseFloat(document.getElementById('inputSpO2').value),dt=document.getElementById('inputDatetime').value,comment=document.getElementById('inputComment').value.trim();
   const dep1=parseFloat(document.getElementById('dep1').value)||null,dep2=parseFloat(document.getElementById('dep2').value)||null,dep3=parseFloat(document.getElementById('dep3').value)||null;
   if(!dt){showToast(t('err_date'),'error');return;}
+  if(new Date(dt)>new Date()){showToast(t('err_date_future'),'error');_flashFieldError('inputDatetime');return;}
   if(!dep){showToast(t('err_no_dep'),'error');_flashFieldError('dep1');return;}
   if(!spo2||spo2<70||spo2>100){showToast(t('err_spo2'),'error');_flashFieldError('inputSpO2');return;}
   if(selectedEasy===null){showToast(t('err_easy'),'error');return;}
@@ -1341,6 +1362,7 @@ document.getElementById('editModal').addEventListener('click',function(e){if(e.t
 // ══════════════════════════════════════════
 function renderDashboard(){
   const measures=DB.measures,cont=document.getElementById('dashboardContent');
+  cont.innerHTML='';
   if(!measures.length){
     cont.innerHTML=`<div class="empty-state"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg><p>${t('db_no_data')}</p></div>`;return;
   }
@@ -1353,35 +1375,73 @@ function renderDashboard(){
   const depTrend  = calcTrend(measures, 'dep');
   const spo2Trend = calcTrend(measures, 'spo2');
   const crisis    = isCrisis(measures);
-  cont.innerHTML=`
-    ${crisis?`<div class="crisis-banner"><div class="crisis-banner-icon">🚨</div><div class="crisis-banner-text"><div class="crisis-banner-title">${t('crisis_title')}</div><div class="crisis-banner-sub">${t('crisis_sub')}</div></div></div>`:''}
-    ${activeRem.length?`<div class="card"><div class="card-title">${t('db_active_reminders')}</div><div>${activeRem.map(r=>`<span class="reminder-badge">🔔 ${r.time} — ${r.label}</span>`).join('')}</div></div>`:''}
-    <div class="card">
-      <div class="card-title">${t('db_last_measure')} — ${new Date(last.dt).toLocaleDateString(t('locale'),{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</div>
-      <div class="metrics-grid">
-        <div class="metric-box ${dz}">
-          <div class="metric-label">${t('db_dep_avg')}</div>
-          <div class="metric-value">${last.dep}${trendArrow(depTrend,'dep')}</div>
-          <div class="metric-unit">L/min</div>
-          <div class="metric-pct">${depPct}% ${t('db_best_pct')}</div>
-          ${depDetail.length>1?`<div class="dep-measurements">${depDetail.join(' · ')}</div>`:''}
-        </div>
-        <div class="metric-box ${sz}">
-          <div class="metric-label">SpO₂</div>
-          <div class="metric-value">${last.spo2}${trendArrow(spo2Trend,'spo2')}</div>
-          <div class="metric-unit">%</div>
-        </div>
-      </div>
-      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
-        <span class="zone-badge ${zoneClass(dz)}">${zoneLabel(dz)}</span>
-        <span class="zone-badge ${zoneClass(sz)}">${zoneLabel(sz)}</span>
-        <span class="zone-badge" style="background:rgba(79,156,249,.1);color:var(--accent)">💊 ${last.easy} ${last.easy>1?t('dose_plural'):t('dose_singular')}</span>
-      </div>
-      ${last.comment?`<div style="margin-top:10px;font-size:14px;color:var(--muted);font-style:italic">"${last.comment}"</div>`:''}
-    </div>
-    <div class="card"><div class="card-title">${t('db_dep_chart')}</div><div class="chart-wrap"><canvas id="chartDEP"></canvas></div></div>
-    <div class="card"><div class="card-title">${t('db_spo2_chart')}</div><div class="chart-wrap"><canvas id="chartSPO2"></canvas></div></div>
-  `;
+
+  // Crisis banner — static i18n text only, safe innerHTML
+  if(crisis){
+    cont.innerHTML+=`<div class="crisis-banner"><div class="crisis-banner-icon">🚨</div><div class="crisis-banner-text"><div class="crisis-banner-title">${t('crisis_title')}</div><div class="crisis-banner-sub">${t('crisis_sub')}</div></div></div>`;
+  }
+
+  // Active reminders — user data: use textContent
+  if(activeRem.length){
+    const remCard=document.createElement('div');remCard.className='card';
+    const remTitle=document.createElement('div');remTitle.className='card-title';remTitle.textContent=t('db_active_reminders');
+    const remBody=document.createElement('div');
+    activeRem.forEach(r=>{
+      const badge=document.createElement('span');badge.className='reminder-badge';
+      badge.textContent=`🔔 ${r.time} — ${r.label}`;
+      remBody.appendChild(badge);
+    });
+    remCard.appendChild(remTitle);remCard.appendChild(remBody);
+    cont.appendChild(remCard);
+  }
+
+  // Last measure card — user data (dep, spo2, comment, easy) via textContent
+  const card=document.createElement('div');card.className='card';
+
+  const cardTitle=document.createElement('div');cardTitle.className='card-title';
+  cardTitle.textContent=`${t('db_last_measure')} — ${new Date(last.dt).toLocaleDateString(t('locale'),{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}`;
+  card.appendChild(cardTitle);
+
+  const grid=document.createElement('div');grid.className='metrics-grid';
+
+  const depBox=document.createElement('div');depBox.className=`metric-box ${dz}`;
+  const depLabel=document.createElement('div');depLabel.className='metric-label';depLabel.textContent=t('db_dep_avg');
+  const depVal=document.createElement('div');depVal.className='metric-value';
+  depVal.textContent=last.dep;depVal.innerHTML+=trendArrow(depTrend,'dep'); // trendArrow returns safe static HTML
+  const depUnit=document.createElement('div');depUnit.className='metric-unit';depUnit.textContent='L/min';
+  const depPctEl=document.createElement('div');depPctEl.className='metric-pct';depPctEl.textContent=`${depPct}% ${t('db_best_pct')}`;
+  depBox.appendChild(depLabel);depBox.appendChild(depVal);depBox.appendChild(depUnit);depBox.appendChild(depPctEl);
+  if(depDetail.length>1){const dm=document.createElement('div');dm.className='dep-measurements';dm.textContent=depDetail.join(' · ');depBox.appendChild(dm);}
+
+  const spo2Box=document.createElement('div');spo2Box.className=`metric-box ${sz}`;
+  const spo2Label=document.createElement('div');spo2Label.className='metric-label';spo2Label.textContent='SpO₂';
+  const spo2Val=document.createElement('div');spo2Val.className='metric-value';
+  spo2Val.textContent=last.spo2;spo2Val.innerHTML+=trendArrow(spo2Trend,'spo2');
+  const spo2Unit=document.createElement('div');spo2Unit.className='metric-unit';spo2Unit.textContent='%';
+  spo2Box.appendChild(spo2Label);spo2Box.appendChild(spo2Val);spo2Box.appendChild(spo2Unit);
+
+  grid.appendChild(depBox);grid.appendChild(spo2Box);
+  card.appendChild(grid);
+
+  const badges=document.createElement('div');badges.style.cssText='margin-top:12px;display:flex;gap:8px;flex-wrap:wrap';
+  const dBadge=document.createElement('span');dBadge.className=`zone-badge ${zoneClass(dz)}`;dBadge.textContent=zoneLabel(dz);
+  const sBadge=document.createElement('span');sBadge.className=`zone-badge ${zoneClass(sz)}`;sBadge.textContent=zoneLabel(sz);
+  const doseBadge=document.createElement('span');doseBadge.className='zone-badge';doseBadge.style.cssText='background:rgba(79,156,249,.1);color:var(--accent)';
+  doseBadge.textContent=`💊 ${last.easy} ${last.easy>1?t('dose_plural'):t('dose_singular')}`;
+  badges.appendChild(dBadge);badges.appendChild(sBadge);badges.appendChild(doseBadge);
+  card.appendChild(badges);
+
+  if(last.comment){
+    const commentEl=document.createElement('div');commentEl.style.cssText='margin-top:10px;font-size:14px;color:var(--muted);font-style:italic';
+    commentEl.textContent=`"${last.comment}"`;
+    card.appendChild(commentEl);
+  }
+  cont.appendChild(card);
+
+  // Chart cards — static structure, safe innerHTML
+  cont.innerHTML+=`<div class="card"><div class="card-title">${t('db_dep_chart')}</div><div class="chart-wrap"><canvas id="chartDEP"></canvas></div></div>`;
+  cont.innerHTML+=`<div class="card"><div class="card-title">${t('db_spo2_chart')}</div><div class="chart-wrap"><canvas id="chartSPO2"></canvas></div></div>`;
+
   drawLineChart('chartDEP',labels,recent.map(m=>m.dep),'#4f9cf9',50,700);
   drawLineChart('chartSPO2',labels,recent.map(m=>m.spo2),'#10d9a0',85,100);
 }
@@ -1420,25 +1480,48 @@ function renderHistory(){
     const dz=depZone(m.dep),sz=spo2Zone(m.spo2),d=new Date(m.dt);
     const dateStr=d.toLocaleDateString(t('locale'),{weekday:'short',day:'2-digit',month:'short'})+' '+d.toLocaleTimeString(t('locale'),{hour:'2-digit',minute:'2-digit'});
     const depDetail=[m.dep1,m.dep2,m.dep3].filter(Boolean);
-    const wrapper=document.createElement('div');
-    wrapper.innerHTML=`<div class="history-item">
-      <div class="history-swipe-bg">🗑</div>
-      <div style="flex:1">
-        <div class="history-date">${dateStr}</div>
-        <div class="history-vals">
-          <span class="history-chip zone-badge ${zoneClass(dz)}">${t('db_dep_avg').split(' ')[0]} ${m.dep}${depDetail.length>1?t('dep_avg_suffix'):''}</span>
-          <span class="history-chip zone-badge ${zoneClass(sz)}">SpO₂ ${m.spo2}%</span>
-          <span class="history-chip" style="color:var(--accent)">💊 ${m.easy}</span>
-        </div>
-        ${depDetail.length>1?`<div class="dep-measurements" style="margin-top:4px">${t('breaths_label')} : ${depDetail.join(' · ')}</div>`:''}
-        ${m.comment?`<div class="history-comment">"${m.comment}"</div>`:''}
-      </div>
-      <div class="history-actions">
-        <button class="icon-action-btn edit" onclick="openEditModal(${m.id})">✏️</button>
-        <button class="icon-action-btn del" onclick="deleteMeasure(${m.id})">✕</button>
-      </div>
-    </div>`;
-    const item = wrapper.firstElementChild;
+
+    // Build the item entirely with DOM APIs — no user data ever touches innerHTML
+    const item=document.createElement('div');item.className='history-item';
+
+    const swipeBg=document.createElement('div');swipeBg.className='history-swipe-bg';swipeBg.textContent='🗑';
+    item.appendChild(swipeBg);
+
+    const body=document.createElement('div');body.style.flex='1';
+
+    const dateLine=document.createElement('div');dateLine.className='history-date';dateLine.textContent=dateStr;
+    body.appendChild(dateLine);
+
+    const vals=document.createElement('div');vals.className='history-vals';
+    const depChip=document.createElement('span');depChip.className=`history-chip zone-badge ${zoneClass(dz)}`;
+    depChip.textContent=`${t('db_dep_avg').split(' ')[0]} ${m.dep}${depDetail.length>1?t('dep_avg_suffix'):''}`;
+    const spo2Chip=document.createElement('span');spo2Chip.className=`history-chip zone-badge ${zoneClass(sz)}`;
+    spo2Chip.textContent=`SpO₂ ${m.spo2}%`;
+    const easyChip=document.createElement('span');easyChip.className='history-chip';easyChip.style.color='var(--accent)';
+    easyChip.textContent=`💊 ${m.easy}`;
+    vals.appendChild(depChip);vals.appendChild(spo2Chip);vals.appendChild(easyChip);
+    body.appendChild(vals);
+
+    if(depDetail.length>1){
+      const dm=document.createElement('div');dm.className='dep-measurements';dm.style.marginTop='4px';
+      dm.textContent=`${t('breaths_label')} : ${depDetail.join(' · ')}`;
+      body.appendChild(dm);
+    }
+    if(m.comment){
+      const commentEl=document.createElement('div');commentEl.className='history-comment';
+      commentEl.textContent=`"${m.comment}"`;
+      body.appendChild(commentEl);
+    }
+    item.appendChild(body);
+
+    const actions=document.createElement('div');actions.className='history-actions';
+    const editBtn=document.createElement('button');editBtn.className='icon-action-btn edit';editBtn.textContent='✏️';
+    editBtn.addEventListener('click',()=>openEditModal(m.id));
+    const delBtn=document.createElement('button');delBtn.className='icon-action-btn del';delBtn.textContent='✕';
+    delBtn.addEventListener('click',()=>deleteMeasure(m.id));
+    actions.appendChild(editBtn);actions.appendChild(delBtn);
+    item.appendChild(actions);
+
     _initSwipe(item, m.id);
     cont.appendChild(item);
   });
@@ -1931,9 +2014,9 @@ function renderSettings(){
       <div class="card-title">${t('settings_drive_title')}</div>
       ${isConnected?`
         <div class="drive-connected">
-          <div class="drive-avatar">${DB.driveAvatar?`<img src="${DB.driveAvatar}" style="width:40px;height:40px;border-radius:50%;object-fit:cover" onerror="this.style.display='none'"/>`:''}<span style="${DB.driveAvatar?'display:none':''}">👤</span></div>
+          <div class="drive-avatar" id="_driveAvatarSlot"><span id="_driveAvatarFallback">👤</span></div>
           <div class="drive-info">
-            <div class="drive-name">${DB.driveUser||'Compte Google'}</div>
+            <div class="drive-name" id="_driveNameSlot"></div>
             <div class="drive-sub">${t('settings_drive_connected')}</div>
           </div>
         </div>
@@ -2014,6 +2097,21 @@ function renderSettings(){
       <div class="setting-row"><span class="zone-badge zone-red">${t('zone_red')}</span><span style="font-size:14px;color:var(--muted)">${t('zone_red_desc')}</span></div>
     </div>
   `;
+  // Inject user-controlled drive avatar/name via DOM — never via innerHTML
+  if(isConnected){
+    const avatarSlot=document.getElementById('_driveAvatarSlot');
+    const fallback=document.getElementById('_driveAvatarFallback');
+    if(DB.driveAvatar&&avatarSlot){
+      const img=document.createElement('img');
+      img.src=DB.driveAvatar; // URL from OAuth — assigned as property, not injected into HTML
+      img.style.cssText='width:40px;height:40px;border-radius:50%;object-fit:cover';
+      img.addEventListener('error',()=>img.style.display='none');
+      avatarSlot.insertBefore(img,fallback);
+      if(fallback)fallback.style.display='none';
+    }
+    const nameSlot=document.getElementById('_driveNameSlot');
+    if(nameSlot)nameSlot.textContent=DB.driveUser||'Compte Google';
+  }
   renderReminderList();
 }
 
@@ -2025,8 +2123,31 @@ let reminderTimers=[];
 function renderReminderList(){
   const list=document.getElementById('reminderList');if(!list)return;
   const rem=DB.reminders;
-  if(!rem.length){list.innerHTML=`<p style="color:var(--muted);font-size:14px;margin-bottom:10px">${t('reminders_empty')}</p>`;return;}
-  list.innerHTML=rem.map((r,i)=>`<div class="reminder-item"><div class="reminder-info"><div class="reminder-time">${r.time}</div><div class="reminder-label-text">${r.label}</div></div><label class="toggle"><input type="checkbox" ${r.active?'checked':''} onchange="toggleReminder(${i})"/><span class="toggle-slider"></span></label><button class="reminder-del" onclick="deleteReminder(${i})">✕</button></div>`).join('');
+  list.innerHTML='';
+  if(!rem.length){
+    const p=document.createElement('p');p.style.cssText='color:var(--muted);font-size:14px;margin-bottom:10px';
+    p.textContent=t('reminders_empty');list.appendChild(p);return;
+  }
+  rem.forEach((r,i)=>{
+    const row=document.createElement('div');row.className='reminder-item';
+
+    const info=document.createElement('div');info.className='reminder-info';
+    const timeEl=document.createElement('div');timeEl.className='reminder-time';timeEl.textContent=r.time;
+    const labelEl=document.createElement('div');labelEl.className='reminder-label-text';labelEl.textContent=r.label;
+    info.appendChild(timeEl);info.appendChild(labelEl);
+
+    const toggle=document.createElement('label');toggle.className='toggle';
+    const cb=document.createElement('input');cb.type='checkbox';cb.checked=!!r.active;
+    cb.addEventListener('change',()=>toggleReminder(i));
+    const slider=document.createElement('span');slider.className='toggle-slider';
+    toggle.appendChild(cb);toggle.appendChild(slider);
+
+    const delBtn=document.createElement('button');delBtn.className='reminder-del';delBtn.textContent='✕';
+    delBtn.addEventListener('click',()=>deleteReminder(i));
+
+    row.appendChild(info);row.appendChild(toggle);row.appendChild(delBtn);
+    list.appendChild(row);
+  });
 }
 function addReminder(){
   const time=document.getElementById('reminderTime').value,label=document.getElementById('reminderLabel').value.trim()||t('reminder_ph_label');
@@ -2077,7 +2198,9 @@ window.addEventListener('unhandledrejection', function(e) {
   console.error('UNHANDLED PROMISE:', e.reason);
 });
 
-// Expose pure functions for Playwright evaluate() calls
+// Expose functions and objects for Playwright evaluate() calls
+window.DB           = DB;
+window.SecureStore  = SecureStore;
 window.predictedDEP = predictedDEP;
 window.calcTrend    = calcTrend;
 window.isCrisis     = isCrisis;
