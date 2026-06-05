@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 const PORT = 3333;
-const ROOT = path.join(__dirname, 'www');
+const ROOT = path.resolve(__dirname, 'www');
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -17,13 +17,28 @@ const MIME = {
 };
 
 http.createServer((req, res) => {
-  const urlPath = req.url === '/' ? '/index.html' : req.url.split('?')[0];
-  const filePath = path.join(ROOT, urlPath);
+  const decodedUrl = decodeURIComponent(req.url);
+  const urlPath = decodedUrl === '/' ? '/index.html' : decodedUrl.split('?')[0];
+
+  // FIX #4 — Path traversal: Block '..' explicitly and verify the resolved path
+  if (urlPath.includes('..')) {
+    res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('Forbidden');
+    return;
+  }
+
+  const filePath = path.resolve(ROOT, urlPath.replace(/^\/+/, ''));
+  if (!filePath.startsWith(ROOT + path.sep) && filePath !== ROOT) {
+    res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('Forbidden');
+    return;
+  }
 
   fs.readFile(filePath, (err, data) => {
     if (err) {
-      res.writeHead(404);
-      res.end('Not found: ' + urlPath);
+      // FIX #5 — Reflected XSS: respond with text/plain, never echo path into HTML
+      res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('Not found');
       return;
     }
     const ext = path.extname(filePath);

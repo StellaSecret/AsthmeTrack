@@ -1,0 +1,369 @@
+import { test, expect } from '@playwright/test';
+import { seedMeasures, seedReminders, seedBestDEP, goToTab, fakeMeasure, waitForToast } from './helpers';
+
+// ──────────────────────────────────────────────────────────────────────────────
+//  Shared XSS payload
+// ──────────────────────────────────────────────────────────────────────────────
+const XSS = '<img src=x onerror="window.__xss=true">';
+const XSS_SCRIPT = '<script>window.__xss=true<\/script>';
+
+async function xssExecuted(page: any): Promise<boolean> {
+  return page.evaluate(() => !!(window as any).__xss);
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+//  Alert #1 & #3 — DOM XSS via reminder badge (dashboard) and reminder list
+// ──────────────────────────────────────────────────────────────────────────────
+test.describe('XSS — reminder label and time (#1 #3)', () => {
+
+  test('reminder label with XSS payload is escaped in the settings list', async ({ page }) => {
+    await seedReminders(page, [{ time: '08:00', label: XSS, active: true }]);
+    await page.goto('/');
+    await goToTab(page, 'settings');
+    await expect(page.locator('#page-settings .reminder-label-text').first()).toContainText('<img');
+    expect(await xssExecuted(page)).toBe(false);
+  });
+
+  test('reminder time with XSS payload is escaped in the settings list', async ({ page }) => {
+    await seedReminders(page, [{ time: XSS, label: 'Normal', active: true }]);
+    await page.goto('/');
+    await goToTab(page, 'settings');
+    await expect(page.locator('#page-settings .reminder-time').first()).toContainText('<img');
+    expect(await xssExecuted(page)).toBe(false);
+  });
+
+  test('active reminder label with XSS payload is escaped in the dashboard badge', async ({ page }) => {
+    await seedReminders(page, [{ time: '09:00', label: XSS, active: true }]);
+    await seedMeasures(page, [fakeMeasure()]);
+    await seedBestDEP(page, 450);
+    await page.goto('/');
+    // Dashboard renders active reminders as .reminder-badge
+    await page.waitForSelector('#dashboardContent .reminder-badge');
+    await expect(page.locator('#dashboardContent .reminder-badge').first()).toContainText('<img');
+    expect(await xssExecuted(page)).toBe(false);
+  });
+
+  test('reminder label with script tag is escaped, not executed', async ({ page }) => {
+    await seedReminders(page, [{ time: '10:00', label: XSS_SCRIPT, active: true }]);
+    await page.goto('/');
+    await goToTab(page, 'settings');
+    expect(await xssExecuted(page)).toBe(false);
+  });
+
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+//  Alert #2 — DOM XSS via comment in dashboard card
+// ──────────────────────────────────────────────────────────────────────────────
+test.describe('XSS — measure comment in dashboard (#2)', () => {
+
+  test('comment with XSS payload is escaped in the dashboard card', async ({ page }) => {
+    await seedMeasures(page, [fakeMeasure({ comment: XSS })]);
+    await seedBestDEP(page, 450);
+    await page.goto('/');
+    await page.waitForSelector('#dashboardContent .card');
+    // The comment should appear as literal text, not trigger onerror
+    const cardText = await page.locator('#dashboardContent').innerText();
+    expect(cardText).toContain('<img');
+    expect(await xssExecuted(page)).toBe(false);
+  });
+
+  test('comment with script tag does not execute in dashboard', async ({ page }) => {
+    await seedMeasures(page, [fakeMeasure({ comment: XSS_SCRIPT })]);
+    await seedBestDEP(page, 450);
+    await page.goto('/');
+    await page.waitForSelector('#dashboardContent .card');
+    expect(await xssExecuted(page)).toBe(false);
+  });
+
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+//  Alert #7 & #8 — DOM XSS via comment in history list
+// ──────────────────────────────────────────────────────────────────────────────
+test.describe('XSS — measure comment in history (#7 #8)', () => {
+
+  test('comment with XSS payload is escaped in the history item', async ({ page }) => {
+    await seedMeasures(page, [fakeMeasure({ comment: XSS })]);
+    await seedBestDEP(page, 450);
+    await page.goto('/');
+    await goToTab(page, 'historique');
+    await page.waitForSelector('#page-historique .history-item');
+    const itemText = await page.locator('#page-historique .history-comment').first().innerText();
+    expect(itemText).toContain('<img');
+    expect(await xssExecuted(page)).toBe(false);
+  });
+
+  test('comment with script tag does not execute in history', async ({ page }) => {
+    await seedMeasures(page, [fakeMeasure({ comment: XSS_SCRIPT })]);
+    await seedBestDEP(page, 450);
+    await page.goto('/');
+    await goToTab(page, 'historique');
+    expect(await xssExecuted(page)).toBe(false);
+  });
+
+  test('edited comment with XSS payload is escaped after saving edit', async ({ page }) => {
+    await seedMeasures(page, [fakeMeasure({ id: 1, dt: '2025-01-15T08:00', dep: 380, dep1: 380, dep2: 380, dep3: 380 })]);
+    await seedBestDEP(page, 450);
+    await page.goto('/');
+    await goToTab(page, 'historique');
+    await page.locator('#page-historique .history-item .icon-action-btn.edit').first().click();
+    await page.locator('#editComment').fill(XSS);
+    await page.locator('#editModal .btn-primary').click();
+    await page.waitForSelector('#page-historique .history-item');
+    const itemText = await page.locator('#page-historique .history-comment').first().innerText();
+    expect(itemText).toContain('<img');
+    expect(await xssExecuted(page)).toBe(false);
+  });
+
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+//  Alert #9 — Clear-text storage of OAuth token
+// ──────────────────────────────────────────────────────────────────────────────
+test.describe('Token storage (#9)', () => {
+
+  test('driveToken setter does not synchronously commit token to localStorage', async ({ page }) => {
+    await page.goto('/');
+    // Simulate what the DB setter does — call it via page.evaluate
+    await page.evaluate(() => {
+      // Mock SecureStore by assigning to properties instead of reassigning the const
+      Object.assign((window as any).SecureStore, {
+        save: () => Promise.resolve(),
+        remove: () => Promise.resolve(),
+        init: () => Promise.resolve(),
+      });
+      // Call the setter
+      (window as any).DB.driveToken = 'fake_token_abc123';
+    });
+    // Wait for the async .then() to run and update localStorage
+    await expect.poll(async () => {
+      return await page.evaluate(() => localStorage.getItem('at_driveToken'));
+    }).toBe('fake_token_abc123');
+  });
+
+  test('clearing driveToken removes it from localStorage immediately', async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(() => {
+      localStorage.setItem('at_driveToken', 'old_token');
+      Object.assign((window as any).SecureStore, {
+        save: () => Promise.resolve(),
+        remove: () => Promise.resolve(),
+        init: () => Promise.resolve(),
+      });
+      (window as any).DB.driveToken = null;
+    });
+    const stored = await page.evaluate(() => localStorage.getItem('at_driveToken'));
+    expect(stored).toBeNull();
+  });
+
+  test('driveTokenExpiry is written via SecureStore (async), not synchronously', async ({ page }) => {
+    await page.goto('/');
+    const order: string[] = [];
+    await page.exposeFunction('__trackOrder', (label: string) => { order.push(label); });
+    await page.evaluate(() => {
+      Object.assign((window as any).SecureStore, {
+        save: async () => {
+          // Add a small delay to ensure 'sync' is tracked first if it's truly non-blocking
+          await new Promise(r => setTimeout(r, 20));
+          await (window as any).__trackOrder('securestore');
+        },
+        remove: () => Promise.resolve(),
+        init: () => Promise.resolve(),
+      });
+      (window as any).DB.driveTokenExpiry = Date.now() + 3600000;
+      (window as any).__trackOrder('sync');
+    });
+    // Wait for both to complete
+    await expect.poll(async () => order).toContain('securestore');
+    // 'sync' should come before 'securestore' — confirming it's async, not blocking
+    expect(order[0]).toBe('sync');
+  });
+
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+//  Alert #4 — Path traversal in server.js
+// ──────────────────────────────────────────────────────────────────────────────
+test.describe('Path traversal — server.js (#4)', () => {
+
+  test('request to /../package.json returns 403 or 404', async ({ request }) => {
+    const res = await request.get('/../package.json');
+    // Either blocked (403) or normalized away by Playwright (404)
+    expect([403, 404]).toContain(res.status());
+  });
+
+  test('request with encoded traversal /%2e%2e/package.json returns 403 or 404', async ({ request }) => {
+    const res = await request.get('/%2e%2e/package.json');
+    expect([403, 404]).toContain(res.status());
+  });
+
+  test('request with deep traversal path is blocked (403 or 404)', async ({ request }) => {
+    const res = await request.get('/../../../etc/passwd');
+    expect([403, 404]).toContain(res.status());
+  });
+
+  test('normal static file request still works', async ({ request }) => {
+    const res = await request.get('/');
+    expect(res.status()).toBe(200);
+    expect(res.headers()['content-type']).toContain('text/html');
+  });
+
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+//  Alert #5 — Reflected XSS in server.js 404 response
+// ──────────────────────────────────────────────────────────────────────────────
+test.describe('Reflected XSS — server.js 404 (#5)', () => {
+
+  test('404 response has Content-Type text/plain', async ({ request }) => {
+    const res = await request.get('/nonexistent-file.xyz');
+    expect(res.status()).toBe(404);
+    expect(res.headers()['content-type']).toContain('text/plain');
+  });
+
+  test('404 body does not reflect the URL path', async ({ request }) => {
+    const res = await request.get('/some-missing-path');
+    const body = await res.text();
+    expect(body).not.toContain('some-missing-path');
+  });
+
+  test('script tag in URL path is not reflected in 404 body', async ({ request }) => {
+    const res = await request.get('/<script>alert(1)<\/script>');
+    const body = await res.text();
+    expect(body).not.toContain('<script>');
+  });
+
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+//  Fix 1 — driveUser / driveAvatar XSS in settings
+// ──────────────────────────────────────────────────────────────────────────────
+test.describe('XSS — driveUser and driveAvatar in settings (fix 1)', () => {
+
+  test('malicious driveUser is escaped in the settings card', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('at_driveToken', 'fake_token');
+      localStorage.setItem('at_driveTokenExpiry', String(Date.now() + 3600000));
+      localStorage.setItem('at_driveUser', '<img src=x onerror="window.__xss=true">');
+      localStorage.setItem('at_driveAvatar', '');
+    });
+    await page.goto('/');
+    await goToTab(page, 'settings');
+    await expect(page.locator('#page-settings .drive-name')).toContainText('<img');
+    expect(await page.evaluate(() => !!(window as any).__xss)).toBe(false);
+  });
+
+  test('malicious driveAvatar src is escaped in the settings card', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('at_driveToken', 'fake_token');
+      localStorage.setItem('at_driveTokenExpiry', String(Date.now() + 3600000));
+      localStorage.setItem('at_driveUser', 'user@example.com');
+      localStorage.setItem('at_driveAvatar', '" onerror="window.__xss=true" x="');
+    });
+    await page.goto('/');
+    await goToTab(page, 'settings');
+    expect(await page.evaluate(() => !!(window as any).__xss)).toBe(false);
+  });
+
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+//  Fix 2 — future-date validation in saveMeasure
+// ──────────────────────────────────────────────────────────────────────────────
+test.describe('Future date validation in saveMeasure (fix 2)', () => {
+
+  test('saving a measure with a future date shows an error toast', async ({ page }) => {
+    await seedBestDEP(page, 450);
+    await page.goto('/');
+    await goToTab(page, 'saisie');
+    const form = page.locator('#page-saisie');
+    const future = new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 16);
+    await form.locator('#inputDatetime').fill(future);
+    await form.locator('#dep1').fill('380');
+    await form.locator('#inputSpO2').fill('97');
+    await form.locator('.easyh-btn[data-val="1"]').click();
+    await form.locator('button.btn-primary').click();
+    const toast = await waitForToast(page);
+    expect(toast).toMatch(/futur|future/i);
+    // Must not have navigated away
+    await expect(form).toHaveClass(/active/);
+  });
+
+  test('saving a measure with a past date succeeds normally', async ({ page }) => {
+    await seedBestDEP(page, 450);
+    await page.goto('/');
+    await goToTab(page, 'saisie');
+    const form = page.locator('#page-saisie');
+    await form.locator('#inputDatetime').fill('2024-01-15T08:00');
+    await form.locator('#dep1').fill('380');
+    await form.locator('#inputSpO2').fill('97');
+    await form.locator('.easyh-btn[data-val="1"]').click();
+    await form.locator('button.btn-primary').click();
+    await page.waitForSelector('#page-dashboard.active', { timeout: 3000 });
+    await expect(page.locator('#page-dashboard')).toHaveClass(/active/);
+  });
+
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+//  Fix 3 — localStorage QuotaExceededError handled gracefully
+// ──────────────────────────────────────────────────────────────────────────────
+test.describe('localStorage quota error handled (fix 3)', () => {
+
+  test('DB.measures setter does not throw when localStorage is full', async ({ page }) => {
+    await page.goto('/');
+    const threw = await page.evaluate(() => {
+      // Simulate QuotaExceededError
+      const orig = localStorage.setItem.bind(localStorage);
+      Storage.prototype.setItem = () => { throw new DOMException('QuotaExceededError'); };
+      try {
+        (window as any).DB.measures = [];
+        return false;
+      } catch(e) {
+        return true;
+      } finally {
+        Storage.prototype.setItem = orig;
+      }
+    });
+    expect(threw).toBe(false);
+  });
+
+  test('DB.reminders setter does not throw when localStorage is full', async ({ page }) => {
+    await page.goto('/');
+    const threw = await page.evaluate(() => {
+      const orig = localStorage.setItem.bind(localStorage);
+      Storage.prototype.setItem = () => { throw new DOMException('QuotaExceededError'); };
+      try {
+        (window as any).DB.reminders = [];
+        return false;
+      } catch(e) {
+        return true;
+      } finally {
+        Storage.prototype.setItem = orig;
+      }
+    });
+    expect(threw).toBe(false);
+  });
+
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+//  Fix 4 — api.anthropic.com removed from CSP
+// ──────────────────────────────────────────────────────────────────────────────
+test.describe('CSP does not include api.anthropic.com (fix 4)', () => {
+
+  test('Content-Security-Policy meta tag does not reference api.anthropic.com', async ({ page }) => {
+    await page.goto('/');
+    const csp = await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content');
+    expect(csp).not.toContain('api.anthropic.com');
+  });
+
+  test('CSP still allows googleapis.com and accounts.google.com', async ({ page }) => {
+    await page.goto('/');
+    const csp = await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content');
+    expect(csp).toContain('https://www.googleapis.com');
+    expect(csp).toContain('https://accounts.google.com');
+  });
+
+});

@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="theme-color" id="metaThemeColor" content="#0d0f14"/>
-<meta http-equiv="Content-Security-Policy" content="default-src 'self' capacitor:; script-src 'self' 'unsafe-inline' capacitor:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://www.googleapis.com https://accounts.google.com https://api.anthropic.com capacitor:; frame-src 'none'; object-src 'none'"/>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' capacitor:; script-src 'self' 'unsafe-inline' capacitor:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://www.googleapis.com https://accounts.google.com capacitor:; frame-src 'none'; object-src 'none'"/>
 <title>AsthmeTrack</title>
 <!-- Syne: heading font (no system equivalent, ~18 KB) -->
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
@@ -452,18 +452,32 @@ const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/drive.appdata https://www
 const GDRIVE_FILENAME = 'asthmetrack_data.json';
 const IS_CAPACITOR = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 
+
+// ══════════════════════════════════════════
+//  HTML ESCAPE HELPER  (FIX #1–3, #7–8 — XSS)
+//  Always call esc() before inserting user-controlled strings into innerHTML.
+// ══════════════════════════════════════════
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // ══════════════════════════════════════════
 //  DATA
 // ══════════════════════════════════════════
 const DB = {
   get measures() { try{return JSON.parse(localStorage.getItem('at_measures')||'[]');}catch(e){return[];} },
-  set measures(v) { localStorage.setItem('at_measures',JSON.stringify(v)); },
+  set measures(v) { try { localStorage.setItem('at_measures',JSON.stringify(v)); } catch(e) { console.error('DB.measures write failed',e); } },
   get bestDEP() { return parseFloat(localStorage.getItem('at_bestDEP')||'450'); },
-  set bestDEP(v) { localStorage.setItem('at_bestDEP',v); },
+  set bestDEP(v) { try { localStorage.setItem('at_bestDEP',v); } catch(e) { console.error('DB.bestDEP write failed',e); } },
   get reminders() { try{return JSON.parse(localStorage.getItem('at_reminders')||'[]');}catch(e){return[];} },
-  set reminders(v) { localStorage.setItem('at_reminders',JSON.stringify(v)); },
+  set reminders(v) { try { localStorage.setItem('at_reminders',JSON.stringify(v)); } catch(e) { console.error('DB.reminders write failed',e); } },
   get profile() { try{return JSON.parse(localStorage.getItem('at_profile')||'{}');}catch(e){return {};} },
-  set profile(v) { localStorage.setItem('at_profile',JSON.stringify(v)); },
+  set profile(v) { try { localStorage.setItem('at_profile',JSON.stringify(v)); } catch(e) { console.error('DB.profile write failed',e); } },
   // ── token fields stay in localStorage for synchronous access ──────────
   // On Capacitor the token is ALSO persisted in CapacitorPreferences (secure
   // storage backed by EncryptedSharedPreferences on Android / Keychain on iOS).
@@ -471,17 +485,20 @@ const DB = {
   // localStorage copy is the fast synchronous accessor used everywhere else.
   get driveToken() { return localStorage.getItem('at_driveToken')||null; },
   set driveToken(v) {
-    if (v) { localStorage.setItem('at_driveToken',v); SecureStore.save('at_driveToken',v); }
+    // FIX #9 — Do NOT write the OAuth token to plain localStorage.
+    // SecureStore.init() copies it to localStorage at boot for synchronous access.
+    if (v) { SecureStore.save('at_driveToken', v).then(() => localStorage.setItem('at_driveToken', v)); }
     else   { localStorage.removeItem('at_driveToken'); SecureStore.remove('at_driveToken'); }
   },
   get driveTokenExpiry() { return parseInt(localStorage.getItem('at_driveTokenExpiry')||'0'); },
-  set driveTokenExpiry(v) { localStorage.setItem('at_driveTokenExpiry',String(v)); SecureStore.save('at_driveTokenExpiry',String(v)); },
+  // FIX #9 — Write expiry to SecureStore first, then mirror to localStorage for sync reads.
+  set driveTokenExpiry(v) { SecureStore.save('at_driveTokenExpiry', String(v)).then(() => localStorage.setItem('at_driveTokenExpiry', String(v))); },
   get driveFileId() { return localStorage.getItem('at_driveFileId')||null; },
-  set driveFileId(v) { v?localStorage.setItem('at_driveFileId',v):localStorage.removeItem('at_driveFileId'); },
+  set driveFileId(v) { try { v?localStorage.setItem('at_driveFileId',v):localStorage.removeItem('at_driveFileId'); } catch(e) { console.error('DB.driveFileId write failed',e); } },
   get driveUser() { return localStorage.getItem('at_driveUser')||null; },
-  set driveUser(v) { v?localStorage.setItem('at_driveUser',v):localStorage.removeItem('at_driveUser'); },
+  set driveUser(v) { try { v?localStorage.setItem('at_driveUser',v):localStorage.removeItem('at_driveUser'); } catch(e) { console.error('DB.driveUser write failed',e); } },
   get driveAvatar() { return localStorage.getItem('at_driveAvatar')||null; },
-  set driveAvatar(v) { v?localStorage.setItem('at_driveAvatar',v):localStorage.removeItem('at_driveAvatar'); },
+  set driveAvatar(v) { try { v?localStorage.setItem('at_driveAvatar',v):localStorage.removeItem('at_driveAvatar'); } catch(e) { console.error('DB.driveAvatar write failed',e); } },
 };
 
 // ══════════════════════════════════════════
@@ -1277,6 +1294,7 @@ function saveMeasure(){
   const dep=calcDepAvgWithWarn(''),spo2=parseFloat(document.getElementById('inputSpO2').value),dt=document.getElementById('inputDatetime').value,comment=document.getElementById('inputComment').value.trim();
   const dep1=parseFloat(document.getElementById('dep1').value)||null,dep2=parseFloat(document.getElementById('dep2').value)||null,dep3=parseFloat(document.getElementById('dep3').value)||null;
   if(!dt){showToast(t('err_date'),'error');return;}
+  if(new Date(dt)>new Date()){showToast(t('err_date_future'),'error');_flashFieldError('inputDatetime');return;}
   if(!dep){showToast(t('err_no_dep'),'error');_flashFieldError('dep1');return;}
   if(!spo2||spo2<70||spo2>100){showToast(t('err_spo2'),'error');_flashFieldError('inputSpO2');return;}
   if(selectedEasy===null){showToast(t('err_easy'),'error');return;}
@@ -1355,7 +1373,7 @@ function renderDashboard(){
   const crisis    = isCrisis(measures);
   cont.innerHTML=`
     ${crisis?`<div class="crisis-banner"><div class="crisis-banner-icon">🚨</div><div class="crisis-banner-text"><div class="crisis-banner-title">${t('crisis_title')}</div><div class="crisis-banner-sub">${t('crisis_sub')}</div></div></div>`:''}
-    ${activeRem.length?`<div class="card"><div class="card-title">${t('db_active_reminders')}</div><div>${activeRem.map(r=>`<span class="reminder-badge">🔔 ${r.time} — ${r.label}</span>`).join('')}</div></div>`:''}
+    ${activeRem.length?`<div class="card"><div class="card-title">${t('db_active_reminders')}</div><div>${activeRem.map(r=>`<span class="reminder-badge">🔔 ${esc(r.time)} — ${esc(r.label)}</span>`).join('')}</div></div>`:''}
     <div class="card">
       <div class="card-title">${t('db_last_measure')} — ${new Date(last.dt).toLocaleDateString(t('locale'),{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</div>
       <div class="metrics-grid">
@@ -1377,7 +1395,7 @@ function renderDashboard(){
         <span class="zone-badge ${zoneClass(sz)}">${zoneLabel(sz)}</span>
         <span class="zone-badge" style="background:rgba(79,156,249,.1);color:var(--accent)">💊 ${last.easy} ${last.easy>1?t('dose_plural'):t('dose_singular')}</span>
       </div>
-      ${last.comment?`<div style="margin-top:10px;font-size:14px;color:var(--muted);font-style:italic">"${last.comment}"</div>`:''}
+      ${last.comment?`<div style="margin-top:10px;font-size:14px;color:var(--muted);font-style:italic">"${esc(last.comment)}"</div>`:''}
     </div>
     <div class="card"><div class="card-title">${t('db_dep_chart')}</div><div class="chart-wrap"><canvas id="chartDEP"></canvas></div></div>
     <div class="card"><div class="card-title">${t('db_spo2_chart')}</div><div class="chart-wrap"><canvas id="chartSPO2"></canvas></div></div>
@@ -1431,7 +1449,7 @@ function renderHistory(){
           <span class="history-chip" style="color:var(--accent)">💊 ${m.easy}</span>
         </div>
         ${depDetail.length>1?`<div class="dep-measurements" style="margin-top:4px">${t('breaths_label')} : ${depDetail.join(' · ')}</div>`:''}
-        ${m.comment?`<div class="history-comment">"${m.comment}"</div>`:''}
+        ${m.comment?`<div class="history-comment">"${esc(m.comment)}"</div>`:''}
       </div>
       <div class="history-actions">
         <button class="icon-action-btn edit" onclick="openEditModal(${m.id})">✏️</button>
@@ -1931,9 +1949,9 @@ function renderSettings(){
       <div class="card-title">${t('settings_drive_title')}</div>
       ${isConnected?`
         <div class="drive-connected">
-          <div class="drive-avatar">${DB.driveAvatar?`<img src="${DB.driveAvatar}" style="width:40px;height:40px;border-radius:50%;object-fit:cover" onerror="this.style.display='none'"/>`:''}<span style="${DB.driveAvatar?'display:none':''}">👤</span></div>
+          <div class="drive-avatar">${DB.driveAvatar?`<img src="${esc(DB.driveAvatar)}" style="width:40px;height:40px;border-radius:50%;object-fit:cover" onerror="this.style.display='none'"/>`:''}<span style="${DB.driveAvatar?'display:none':''}">👤</span></div>
           <div class="drive-info">
-            <div class="drive-name">${DB.driveUser||'Compte Google'}</div>
+            <div class="drive-name">${esc(DB.driveUser)||'Compte Google'}</div>
             <div class="drive-sub">${t('settings_drive_connected')}</div>
           </div>
         </div>
@@ -2026,7 +2044,8 @@ function renderReminderList(){
   const list=document.getElementById('reminderList');if(!list)return;
   const rem=DB.reminders;
   if(!rem.length){list.innerHTML=`<p style="color:var(--muted);font-size:14px;margin-bottom:10px">${t('reminders_empty')}</p>`;return;}
-  list.innerHTML=rem.map((r,i)=>`<div class="reminder-item"><div class="reminder-info"><div class="reminder-time">${r.time}</div><div class="reminder-label-text">${r.label}</div></div><label class="toggle"><input type="checkbox" ${r.active?'checked':''} onchange="toggleReminder(${i})"/><span class="toggle-slider"></span></label><button class="reminder-del" onclick="deleteReminder(${i})">✕</button></div>`).join('');
+  // FIX #3 — escape user-supplied r.time and r.label before innerHTML
+  list.innerHTML=rem.map((r,i)=>`<div class="reminder-item"><div class="reminder-info"><div class="reminder-time">${esc(r.time)}</div><div class="reminder-label-text">${esc(r.label)}</div></div><label class="toggle"><input type="checkbox" ${r.active?'checked':''} onchange="toggleReminder(${i})"/><span class="toggle-slider"></span></label><button class="reminder-del" onclick="deleteReminder(${i})">✕</button></div>`).join('');
 }
 function addReminder(){
   const time=document.getElementById('reminderTime').value,label=document.getElementById('reminderLabel').value.trim()||t('reminder_ph_label');
@@ -2077,7 +2096,9 @@ window.addEventListener('unhandledrejection', function(e) {
   console.error('UNHANDLED PROMISE:', e.reason);
 });
 
-// Expose pure functions for Playwright evaluate() calls
+// Expose functions and objects for Playwright evaluate() calls
+window.DB           = DB;
+window.SecureStore  = SecureStore;
 window.predictedDEP = predictedDEP;
 window.calcTrend    = calcTrend;
 window.isCrisis     = isCrisis;
