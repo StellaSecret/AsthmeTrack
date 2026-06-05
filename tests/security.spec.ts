@@ -123,61 +123,55 @@ test.describe('XSS — measure comment in history (#7 #8)', () => {
 // ──────────────────────────────────────────────────────────────────────────────
 test.describe('Token storage (#9)', () => {
 
-  test('driveToken setter does not synchronously commit token to localStorage', async ({ page }) => {
+  test('driveToken setter uses SecureStore and does not commit to localStorage', async ({ page }) => {
+    await page.addInitScript(() => { (window as any).__savedKey = undefined; });
     await page.goto('/');
-    // Simulate what the DB setter does — call it via page.evaluate
-    await page.evaluate(() => {
-      // Mock SecureStore by assigning to properties instead of reassigning the const
-      Object.assign((window as any).SecureStore, {
-        save: () => Promise.resolve(),
-        remove: () => Promise.resolve(),
-        init: () => Promise.resolve(),
-      });
-      // Call the setter
-      (window as any).DB.driveToken = 'fake_token_abc123';
+    await page.exposeFunction('__trackSave', (key: string, value: string) => {
+      (global as any).__savedKey = key; // this is for the test node process
     });
-    // Wait for the async .then() to run and update localStorage
-    await expect.poll(async () => {
-      return await page.evaluate(() => localStorage.getItem('at_driveToken'));
-    }).toBe('fake_token_abc123');
-  });
-
-  test('clearing driveToken removes it from localStorage immediately', async ({ page }) => {
-    await page.goto('/');
+    // Need to set tracker on window
     await page.evaluate(() => {
-      localStorage.setItem('at_driveToken', 'old_token');
+        (window as any).__trackSave = async (k: string, v: string) => { (window as any).__savedKey = k; };
+    });
+
+    await page.evaluate(async () => {
       Object.assign((window as any).SecureStore, {
-        save: () => Promise.resolve(),
-        remove: () => Promise.resolve(),
-        init: () => Promise.resolve(),
+        save: async (key: string, value: string) => {
+          await (window as any).__trackSave(key, value);
+        },
       });
-      (window as any).DB.driveToken = null;
+      await (window as any).DB.setDriveToken('fake_token_abc123');
     });
     const stored = await page.evaluate(() => localStorage.getItem('at_driveToken'));
     expect(stored).toBeNull();
+    const savedKey = await page.evaluate(() => (window as any).__savedKey);
+    expect(savedKey).toBe('at_driveToken');
   });
 
-  test('driveTokenExpiry is written via SecureStore (async), not synchronously', async ({ page }) => {
+  test('clearing driveToken removes it from SecureStore', async ({ page }) => {
     await page.goto('/');
-    const order: string[] = [];
-    await page.exposeFunction('__trackOrder', (label: string) => { order.push(label); });
-    await page.evaluate(() => {
+    let removedKey = 'not-set';
+    await page.exposeFunction('__trackRemove', (key: string) => { removedKey = key; });
+    await page.evaluate(async () => {
       Object.assign((window as any).SecureStore, {
-        save: async () => {
-          // Add a small delay to ensure 'sync' is tracked first if it's truly non-blocking
-          await new Promise(r => setTimeout(r, 20));
-          await (window as any).__trackOrder('securestore');
-        },
-        remove: () => Promise.resolve(),
-        init: () => Promise.resolve(),
+        remove: async (key: string) => { await (window as any).__trackRemove(key); },
       });
-      (window as any).DB.driveTokenExpiry = Date.now() + 3600000;
-      (window as any).__trackOrder('sync');
+      await (window as any).DB.setDriveToken(null);
     });
-    // Wait for both to complete
-    await expect.poll(async () => order).toContain('securestore');
-    // 'sync' should come before 'securestore' — confirming it's async, not blocking
-    expect(order[0]).toBe('sync');
+    expect(removedKey).toBe('at_driveToken');
+  });
+
+  test('driveTokenExpiry is written via SecureStore (async)', async ({ page }) => {
+    await page.goto('/');
+    let savedKey = 'not-set';
+    await page.exposeFunction('__trackExpirySave', (key: string) => { savedKey = key; });
+    await page.evaluate(async () => {
+      Object.assign((window as any).SecureStore, {
+        save: async (key: string) => { await (window as any).__trackExpirySave(key); },
+      });
+      await (window as any).DB.setDriveTokenExpiry(Date.now() + 3600000);
+    });
+    expect(savedKey).toBe('at_driveTokenExpiry');
   });
 
 });

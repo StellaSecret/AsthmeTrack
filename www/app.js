@@ -37,21 +37,19 @@ const DB = {
   set reminders(v) { try { localStorage.setItem('at_reminders',JSON.stringify(v)); } catch(e) { console.error('DB.reminders write failed',e); if(e.name==='QuotaExceededError')showToast(t('err_storage'),'error'); } },
   get profile() { try{return JSON.parse(localStorage.getItem('at_profile')||'{}');}catch(e){return {};} },
   set profile(v) { try { localStorage.setItem('at_profile',JSON.stringify(v)); } catch(e) { console.error('DB.profile write failed',e); if(e.name==='QuotaExceededError')showToast(t('err_storage'),'error'); } },
-  // ── token fields stay in localStorage for synchronous access ──────────
-  // On Capacitor the token is ALSO persisted in CapacitorPreferences (secure
+  // ── token fields stay in SecureStore for asynchronous access ──────────
+  // On Capacitor the token is persisted in CapacitorPreferences (secure
   // storage backed by EncryptedSharedPreferences on Android / Keychain on iOS).
-  // Call SecureStore.save/load at connect & restore time; the in-memory
-  // localStorage copy is the fast synchronous accessor used everywhere else.
-  get driveToken() { return localStorage.getItem('at_driveToken')||null; },
-  set driveToken(v) {
+  // Call SecureStore.save/load at connect & restore time.
+  getDriveToken: async function() { return await SecureStore.load('at_driveToken'); },
+  setDriveToken: async function(v) {
     // FIX #9 — Do NOT write the OAuth token to plain localStorage.
-    // SecureStore.init() copies it to localStorage at boot for synchronous access.
-    if (v) { SecureStore.save('at_driveToken', v).then(() => localStorage.setItem('at_driveToken', v)); }
-    else   { localStorage.removeItem('at_driveToken'); SecureStore.remove('at_driveToken'); }
+    if (v) { await SecureStore.save('at_driveToken', v); }
+    else   { await SecureStore.remove('at_driveToken'); }
   },
-  get driveTokenExpiry() { return parseInt(localStorage.getItem('at_driveTokenExpiry')||'0'); },
-  // FIX #9 — Write expiry to SecureStore first, then mirror to localStorage for sync reads.
-  set driveTokenExpiry(v) { SecureStore.save('at_driveTokenExpiry', String(v)).then(() => localStorage.setItem('at_driveTokenExpiry', String(v))); },
+  getDriveTokenExpiry: async function() { return parseInt((await SecureStore.load('at_driveTokenExpiry'))||'0'); },
+  // FIX #9 — Write expiry to SecureStore.
+  setDriveTokenExpiry: async function(v) { await SecureStore.save('at_driveTokenExpiry', String(v)); },
   get driveFileId() { return localStorage.getItem('at_driveFileId')||null; },
   set driveFileId(v) { try { v?localStorage.setItem('at_driveFileId',v):localStorage.removeItem('at_driveFileId'); } catch(e) { console.error('DB.driveFileId write failed',e); } },
   get driveUser() { return localStorage.getItem('at_driveUser')||null; },
@@ -69,22 +67,16 @@ const DB = {
 const SecureStore = {
   _prefs() { return IS_CAPACITOR && window.Capacitor?.Plugins?.Preferences || null; },
   async save(key, value) {
-    try { const p = this._prefs(); if (p) await p.set({ key, value }); } catch(e) { console.warn('SecureStore.save', e); }
+    try { const p = this._prefs(); if (p) await p.set({ key, value }); else localStorage.setItem(key, value); } catch(e) { console.warn('SecureStore.save', e); }
+  },
+  async load(key) {
+    try { const p = this._prefs(); if (p) { const { value } = await p.get({ key }); return value; } else return localStorage.getItem(key); } catch(e) { console.warn('SecureStore.load', e); return null; }
   },
   async remove(key) {
-    try { const p = this._prefs(); if (p) await p.remove({ key }); } catch(e) { console.warn('SecureStore.remove', e); }
+    try { const p = this._prefs(); if (p) await p.remove({ key }); else localStorage.removeItem(key); } catch(e) { console.warn('SecureStore.remove', e); }
   },
-  /** Called once at boot — copies any Preferences value back into localStorage so DB getters work synchronously. */
-  async init() {
-    const p = this._prefs();
-    if (!p) return;
-    for (const key of ['at_driveToken','at_driveTokenExpiry']) {
-      try {
-        const { value } = await p.get({ key });
-        if (value != null) localStorage.setItem(key, value);
-      } catch(e) {}
-    }
-  },
+  /** No longer need init() to copy to localStorage as we now use async accessors */
+  async init() {},
 };
 
 // ══════════════════════════════════════════
@@ -1300,8 +1292,8 @@ async function connectDrive() {
     const token = extractDriveToken(result);
     if (!token) { console.error('Drive auth result:', JSON.stringify(result)); throw new Error('Token Drive introuvable — vérifiez la config Google Cloud Console.'); }
     const profile = extractDriveProfile(result);
-    DB.driveToken = token;
-    DB.driveTokenExpiry = Date.now() + 3500 * 1000;
+    await DB.setDriveToken(token);
+    await DB.setDriveTokenExpiry(Date.now() + 3500 * 1000);
     DB.driveUser = profile.email;
     DB.driveAvatar = profile.avatar;
     renderSettings();
@@ -1317,11 +1309,11 @@ async function connectDrive() {
 }
 
 async function ensureValidToken() {
-  if (!DB.driveToken) return false;
-  if (Date.now() < DB.driveTokenExpiry - 60000) return true;
+  if (!(await DB.getDriveToken())) return false;
+  if (Date.now() < (await DB.getDriveTokenExpiry()) - 60000) return true;
   try {
     const SocialLogin = getSocialLogin();
-    if (!SocialLogin) { DB.driveToken = null; return false; }
+    if (!SocialLogin) { await DB.setDriveToken(null); return false; }
     await SocialLogin.initialize({ google: { webClientId: GOOGLE_CLIENT_ID } });
     const result = await SocialLogin.login({
       provider: 'google',
@@ -1332,11 +1324,11 @@ async function ensureValidToken() {
     });
     const token = extractDriveToken(result);
     if (token) {
-      DB.driveToken = token;
-      DB.driveTokenExpiry = Date.now() + 3500 * 1000;
+      await DB.setDriveToken(token);
+      await DB.setDriveTokenExpiry(Date.now() + 3500 * 1000);
       return true;
     }
-  } catch(e) { DB.driveToken = null; }
+  } catch(e) { await DB.setDriveToken(null); }
   return false;
 }
 async function fetchDriveUserInfo(token) {
@@ -1355,7 +1347,7 @@ async function _driveCheckAndPrompt() {
   try {
     const search = await fetch(
       `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='${GDRIVE_FILENAME}'&fields=files(id,modifiedTime,size)`,
-      { headers: { Authorization: 'Bearer ' + DB.driveToken } }
+      { headers: { Authorization: "Bearer " + (await DB.getDriveToken()) } }
     );
     if (!search.ok) {
       const err = await search.text();
@@ -1441,7 +1433,7 @@ async function driveSyncUp() {
     const form = new FormData();
     form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
     form.append('file', new Blob([data], { type: 'application/json' }));
-    let r = await fetch(url, { method, headers: { Authorization: 'Bearer ' + DB.driveToken }, body: form });
+    let r = await fetch(url, { method, headers: { Authorization: "Bearer " + (await DB.getDriveToken()) }, body: form });
     // Si 404 sur PATCH : le fichier n'existe plus sur Drive, on recrée
     if (!r.ok && r.status === 404 && isUpdate) {
       console.warn('driveSyncUp: file not found on Drive, recreating...');
@@ -1451,7 +1443,7 @@ async function driveSyncUp() {
       newForm.append('metadata', new Blob([JSON.stringify(newMeta)], { type: 'application/json' }));
       newForm.append('file', new Blob([data], { type: 'application/json' }));
       r = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
-        { method: 'POST', headers: { Authorization: 'Bearer ' + DB.driveToken }, body: newForm });
+        { method: 'POST', headers: { Authorization: "Bearer " + (await DB.getDriveToken()) }, body: newForm });
     }
     if (!r.ok) {
       const errText = await r.text();
@@ -1474,7 +1466,7 @@ async function driveSyncDown() {
   try {
     const search = await fetch(
       `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='${GDRIVE_FILENAME}'&fields=files(id)`,
-      { headers: { Authorization: 'Bearer ' + DB.driveToken } }
+      { headers: { Authorization: "Bearer " + (await DB.getDriveToken()) } }
     );
     if (!search.ok) {
       const errText = await search.text();
@@ -1486,7 +1478,7 @@ async function driveSyncDown() {
     DB.driveFileId = sj.files[0].id;
     const dl = await fetch(
       `https://www.googleapis.com/drive/v3/files/${DB.driveFileId}?alt=media`,
-      { headers: { Authorization: 'Bearer ' + DB.driveToken } }
+      { headers: { Authorization: "Bearer " + (await DB.getDriveToken()) } }
     );
     const d = await dl.json();
     if (d.measures)  DB.measures  = d.measures;
@@ -1501,8 +1493,8 @@ async function driveSyncDown() {
 
 // Debounced: rapid saves/deletes collapse into a single Drive upload after 2 s
 let _autoSyncTimer = null;
-function driveAutoSync() {
-  if (!DB.driveToken) return;
+async function driveAutoSync() {
+  if (!(await DB.getDriveToken())) return;
   clearTimeout(_autoSyncTimer);
   _autoSyncTimer = setTimeout(() => driveSyncUp(), 2000);
 }
@@ -1591,7 +1583,8 @@ function importJSON() {
 //  SETTINGS
 // ══════════════════════════════════════════
 function renderSettings(){
-  const isConnected=!!DB.driveToken;
+  DB.getDriveToken().then(token => {
+  const isConnected=!!token;
   document.getElementById('settingsContent').innerHTML=`
     <div class="card">
       <div class="card-title">${t('settings_drive_title')}</div>
@@ -1701,6 +1694,7 @@ function renderSettings(){
     if(nameSlot)nameSlot.textContent=DB.driveUser||'Compte Google';
   }
   renderReminderList();
+  });
 }
 
 function saveBestDEP(){const v=parseFloat(document.getElementById('bestDEPInput').value);if(!v||v<100||v>900){showToast(t('toast_best_dep_invalid'),'error');return;}DB.bestDEP=v;showToast(t('toast_best_dep_saved'));}

@@ -18,16 +18,16 @@ const MIME = {
 
 http.createServer((req, res) => {
   const decodedUrl = decodeURIComponent(req.url);
+  // Remove query parameters
   const urlPath = decodedUrl === '/' ? '/index.html' : decodedUrl.split('?')[0];
 
-  // FIX #4 — Path traversal: Block '..' explicitly and verify the resolved path
-  if (urlPath.includes('..')) {
-    res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
-    res.end('Forbidden');
-    return;
-  }
+  // Sanitize path by removing '..' to prevent directory traversal
+  const sanitizedPath = path.normalize(urlPath).replace(/^(\.\.[\/\\])+/, '');
 
-  const filePath = path.resolve(ROOT, urlPath.replace(/^\/+/, ''));
+  // Resolve absolute path
+  const filePath = path.join(ROOT, sanitizedPath);
+
+  // Security check: ensure the resolved path is within the ROOT directory
   if (!filePath.startsWith(ROOT + path.sep) && filePath !== ROOT) {
     res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
     res.end('Forbidden');
