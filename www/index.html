@@ -471,13 +471,13 @@ function esc(s) {
 // ══════════════════════════════════════════
 const DB = {
   get measures() { try{return JSON.parse(localStorage.getItem('at_measures')||'[]');}catch(e){return[];} },
-  set measures(v) { try { localStorage.setItem('at_measures',JSON.stringify(v)); } catch(e) { console.error('DB.measures write failed',e); } },
+  set measures(v) { try { localStorage.setItem('at_measures',JSON.stringify(v)); } catch(e) { console.error('DB.measures write failed',e); if(e.name==='QuotaExceededError')showToast(t('err_storage'),'error'); } },
   get bestDEP() { return parseFloat(localStorage.getItem('at_bestDEP')||'450'); },
-  set bestDEP(v) { try { localStorage.setItem('at_bestDEP',v); } catch(e) { console.error('DB.bestDEP write failed',e); } },
+  set bestDEP(v) { try { localStorage.setItem('at_bestDEP',v); } catch(e) { console.error('DB.bestDEP write failed',e); if(e.name==='QuotaExceededError')showToast(t('err_storage'),'error'); } },
   get reminders() { try{return JSON.parse(localStorage.getItem('at_reminders')||'[]');}catch(e){return[];} },
-  set reminders(v) { try { localStorage.setItem('at_reminders',JSON.stringify(v)); } catch(e) { console.error('DB.reminders write failed',e); } },
+  set reminders(v) { try { localStorage.setItem('at_reminders',JSON.stringify(v)); } catch(e) { console.error('DB.reminders write failed',e); if(e.name==='QuotaExceededError')showToast(t('err_storage'),'error'); } },
   get profile() { try{return JSON.parse(localStorage.getItem('at_profile')||'{}');}catch(e){return {};} },
-  set profile(v) { try { localStorage.setItem('at_profile',JSON.stringify(v)); } catch(e) { console.error('DB.profile write failed',e); } },
+  set profile(v) { try { localStorage.setItem('at_profile',JSON.stringify(v)); } catch(e) { console.error('DB.profile write failed',e); if(e.name==='QuotaExceededError')showToast(t('err_storage'),'error'); } },
   // ── token fields stay in localStorage for synchronous access ──────────
   // On Capacitor the token is ALSO persisted in CapacitorPreferences (secure
   // storage backed by EncryptedSharedPreferences on Android / Keychain on iOS).
@@ -632,6 +632,7 @@ const LANG = {
     err_no_dep: '⚠️ Saisir au moins un souffle DEP',
     err_spo2: '⚠️ SpO₂ invalide',
     err_easy: '⚠️ Choisir nbre de prises',
+    err_storage: '⚠️ Stockage plein — donnée non sauvegardée',
     err_date: '⚠️ Date manquante',
     err_date_future: '⚠️ La date ne peut pas être dans le futur',
     err_dep_range: '⚠️ Valeur DEP hors limites (50–900) ignorée',
@@ -791,6 +792,7 @@ const LANG = {
     err_no_dep: '⚠️ Enter at least one PEF blow',
     err_spo2: '⚠️ Invalid SpO₂',
     err_easy: '⚠️ Choose number of doses',
+    err_storage: '⚠️ Storage full — data not saved',
     err_date: '⚠️ Date missing',
     err_date_future: '⚠️ Date cannot be in the future',
     err_dep_range: '⚠️ PEF value out of range (50–900) ignored',
@@ -2102,12 +2104,17 @@ function renderSettings(){
     const avatarSlot=document.getElementById('_driveAvatarSlot');
     const fallback=document.getElementById('_driveAvatarFallback');
     if(DB.driveAvatar&&avatarSlot){
-      const img=document.createElement('img');
-      img.src=DB.driveAvatar; // URL from OAuth — assigned as property, not injected into HTML
-      img.style.cssText='width:40px;height:40px;border-radius:50%;object-fit:cover';
-      img.addEventListener('error',()=>img.style.display='none');
-      avatarSlot.insertBefore(img,fallback);
-      if(fallback)fallback.style.display='none';
+      // Only allow https: URLs — guards against javascript: or data: protocol abuse
+      let avatarUrl='';
+      try { avatarUrl=new URL(DB.driveAvatar).protocol==='https:'?DB.driveAvatar:''; } catch(e) { avatarUrl=''; }
+      if(avatarUrl){
+        const img=document.createElement('img');
+        img.src=avatarUrl;
+        img.style.cssText='width:40px;height:40px;border-radius:50%;object-fit:cover';
+        img.addEventListener('error',()=>img.style.display='none');
+        avatarSlot.insertBefore(img,fallback);
+        if(fallback)fallback.style.display='none';
+      }
     }
     const nameSlot=document.getElementById('_driveNameSlot');
     if(nameSlot)nameSlot.textContent=DB.driveUser||'Compte Google';
