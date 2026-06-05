@@ -2077,6 +2077,13 @@ window.addEventListener('unhandledrejection', function(e) {
   console.error('UNHANDLED PROMISE:', e.reason);
 });
 
+// Expose pure functions for Playwright evaluate() calls
+window.predictedDEP = predictedDEP;
+window.calcTrend    = calcTrend;
+window.isCrisis     = isCrisis;
+window.depZone      = depZone;
+window.spo2Zone     = spo2Zone;
+
 document.addEventListener('DOMContentLoaded', async ()=>{
   await SecureStore.init();
   applyTheme(isDark());
