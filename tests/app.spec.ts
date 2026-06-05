@@ -299,18 +299,18 @@ test.describe('Dashboard — crisis banner', () => {
 
 test.describe('Dashboard — trend arrows', () => {
 
-  test('up arrow shown when last 7 days DEP improved vs previous 7 days', async ({ page }) => {
+  test('up arrow shown when last 3 days DEP improved vs previous 3 days', async ({ page }) => {
     const now = Date.now();
     const measures = [
-      // last 7 days: high DEP (good)
+      // last 3 days: high DEP (good)
       ...Array.from({ length: 3 }, (_, i) => fakeMeasure({
         id: now + i, dep: 420,
         dt: new Date(now - i * 24 * 3600 * 1000).toISOString(),
       })),
-      // previous 7 days: low DEP
+      // previous 3 days: low DEP
       ...Array.from({ length: 3 }, (_, i) => fakeMeasure({
         id: now - 10000 + i, dep: 300,
-        dt: new Date(now - (8 + i) * 24 * 3600 * 1000).toISOString(),
+        dt: new Date(now - (4 + i) * 24 * 3600 * 1000).toISOString(),
       })),
     ];
     await seedMeasures(page, measures);
@@ -320,7 +320,7 @@ test.describe('Dashboard — trend arrows', () => {
     await expect(page.locator('.trend-up').first()).toBeVisible();
   });
 
-  test('down arrow shown when last 7 days DEP worsened', async ({ page }) => {
+  test('down arrow shown when last 3 days DEP worsened', async ({ page }) => {
     const now = Date.now();
     const measures = [
       ...Array.from({ length: 3 }, (_, i) => fakeMeasure({
@@ -329,7 +329,7 @@ test.describe('Dashboard — trend arrows', () => {
       })),
       ...Array.from({ length: 3 }, (_, i) => fakeMeasure({
         id: now - 10000 + i, dep: 420,
-        dt: new Date(now - (8 + i) * 24 * 3600 * 1000).toISOString(),
+        dt: new Date(now - (4 + i) * 24 * 3600 * 1000).toISOString(),
       })),
     ];
     await seedMeasures(page, measures);
@@ -348,7 +348,7 @@ test.describe('Dashboard — trend arrows', () => {
       })),
       ...Array.from({ length: 3 }, (_, i) => fakeMeasure({
         id: now - 10000 + i, dep: 400,
-        dt: new Date(now - (8 + i) * 24 * 3600 * 1000).toISOString(),
+        dt: new Date(now - (4 + i) * 24 * 3600 * 1000).toISOString(),
       })),
     ];
     await seedMeasures(page, measures);
