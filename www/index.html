@@ -329,7 +329,7 @@
     </div>
     <div class="field">
       <label data-i18n="label_comment">Commentaire (facultatif)</label>
-      <textarea id="inputComment" placeholder="Symptômes, contexte, météo…"></textarea>
+      <textarea id="inputComment" maxlength="500" placeholder="Symptômes, contexte, météo…"></textarea>
     </div>
     <button class="btn-primary" data-i18n="btn_save_measure" onclick="saveMeasure()">Enregistrer la mesure</button>
   </div>
@@ -431,7 +431,7 @@
         <button class="easyh-btn" data-val="5" onclick="selectEditEasy(5)">5</button>
       </div>
     </div>
-    <div class="field"><label>Commentaire</label><textarea id="editComment" placeholder="Symptômes, contexte…"></textarea></div>
+    <div class="field"><label>Commentaire</label><textarea id="editComment" maxlength="500" placeholder="Symptômes, contexte…"></textarea></div>
     <button class="btn-primary" onclick="saveEdit()">Enregistrer les modifications</button>
   </div>
 </div>
@@ -555,7 +555,6 @@ const LANG = {
     label_spo2_ph: 'ex. 97',
     dep_hint: '⚠ Hors limites (50–900)',
     spo2_hint: '⚠ Hors limites (70–100)',
-    dep_hint: '⚠ Hors limites (50–900)',
     label_easyhaler: "Prises Easyhaler aujourd'hui",
     label_comment: 'Commentaire (facultatif)',
     comment_ph: 'Symptômes, contexte, météo…',
@@ -715,7 +714,6 @@ const LANG = {
     label_spo2_ph: 'e.g. 97',
     dep_hint: '⚠ Out of range (50–900)',
     spo2_hint: '⚠ Out of range (70–100)',
-    dep_hint: '⚠ Out of range (50–900)',
     label_easyhaler: 'Easyhaler doses today',
     label_comment: 'Comment (optional)',
     comment_ph: 'Symptoms, context, weather…',
@@ -1304,7 +1302,7 @@ function saveMeasure(){
   if(!spo2||spo2<70||spo2>100){showToast(t('err_spo2'),'error');_flashFieldError('inputSpO2');return;}
   if(selectedEasy===null){showToast(t('err_easy'),'error');return;}
   const measures=DB.measures;
-  measures.unshift({id:Date.now(),dt,dep,dep1,dep2,dep3,spo2,easy:selectedEasy,comment});
+  measures.unshift({id:nextId(),dt,dep,dep1,dep2,dep3,spo2,easy:selectedEasy,comment});
   DB.measures=measures;
   showToast(t('toast_saved'));
   driveAutoSync();
@@ -1988,6 +1986,9 @@ function importJSON() {
       const data = JSON.parse(text);
       // Basic schema validation
       if (!Array.isArray(data.measures)) throw new Error(t('toast_json_invalid'));
+      // TODO(migration): when the schema changes, add a migrateBackup(data) function here
+      // that upgrades older version numbers (e.g. v1→v2) before writing to DB.
+      // Current export format is version 2. Older backups without a version field are v1.
       const existing = DB.measures.length;
       if (existing > 0) {
         if (!confirm(t('import_confirm', data.measures.length, existing))) return;
@@ -2192,16 +2193,23 @@ function scheduleReminders(){
   });
 }
 
+// Monotonic ID — millisecond timestamp + per-ms counter, collision-safe even in rapid imports
+let _idSeq = 0, _idLastMs = 0;
+function nextId() {
+  const ms = Date.now();
+  if (ms === _idLastMs) { _idSeq++; } else { _idLastMs = ms; _idSeq = 0; }
+  return ms * 1000 + _idSeq;
+}
 // ══════════════════════════════════════════
-//  INIT
-// ══════════════════════════════════════════
+// Dev-only error toasts — never leak stack traces in production
+const isDev = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
 // Capture toutes les erreurs JS pour debug
 window.onerror = function(msg, src, line, col, err) {
-  showToast('JS Error: ' + msg, 'error');
+  if (isDev) showToast('JS Error: ' + msg, 'error');
   console.error('GLOBAL ERROR:', msg, src, line, col, err);
 };
 window.addEventListener('unhandledrejection', function(e) {
-  showToast('Promise Error: ' + e.reason, 'error');
+  if (isDev) showToast('Promise Error: ' + e.reason, 'error');
   console.error('UNHANDLED PROMISE:', e.reason);
 });
 
