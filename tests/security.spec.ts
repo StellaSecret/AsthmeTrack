@@ -177,13 +177,61 @@ test.describe('Token storage (#9)', () => {
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
+//  Alert #12 — Clear-text storage of sensitive health data (PII)
+// ──────────────────────────────────────────────────────────────────────────────
+test.describe('Health data storage (#12)', () => {
+
+  test('profile data is not stored in clear-text localStorage when SecureStore is active', async ({ page }) => {
+    await page.addInitScript(() => {
+      (window as any).Capacitor = {
+        isNativePlatform: () => true,
+        Plugins: { Preferences: {
+          set: () => Promise.resolve(),
+          get: () => Promise.resolve({ value: null }),
+          remove: () => Promise.resolve()
+        }}
+      };
+    });
+    await page.goto('/');
+    await page.evaluate(async () => {
+      await (window as any).DB.load();
+      (window as any).DB.profile = { sex: 'M', age: 30, height: 180 };
+    });
+    // Give a small amount of time for any potential async bleed (shouldn't happen)
+    await page.waitForTimeout(200);
+    const stored = await page.evaluate(() => localStorage.getItem('at_profile'));
+    expect(stored).toBeNull();
+  });
+
+  test('measures data is not stored in clear-text localStorage when SecureStore is active', async ({ page }) => {
+    await page.addInitScript(() => {
+      (window as any).Capacitor = {
+        isNativePlatform: () => true,
+        Plugins: { Preferences: {
+          set: () => Promise.resolve(),
+          get: () => Promise.resolve({ value: null })
+        }}
+      };
+    });
+    await page.goto('/');
+    await page.evaluate(async () => {
+      (window as any).DB.measures = [{ id: 1, dt: '2025-01-01T10:00', dep: 400 }];
+    });
+    await page.waitForTimeout(200);
+    const stored = await page.evaluate(() => localStorage.getItem('at_measures'));
+    expect(stored).toBeNull();
+  });
+
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
 //  Alert #4 — Path traversal in server.js
 // ──────────────────────────────────────────────────────────────────────────────
-test.describe('Path traversal — server.js (#4)', () => {
+test.describe('Path traversal — server.js (#4 #11)', () => {
 
   test('request to /../package.json returns 403 or 404', async ({ request }) => {
     const res = await request.get('/../package.json');
-    // Either blocked (403) or normalized away by Playwright (404)
+    // Client might normalize to /package.json (404) or server might block (403)
     expect([403, 404]).toContain(res.status());
   });
 
@@ -195,6 +243,12 @@ test.describe('Path traversal — server.js (#4)', () => {
   test('request with deep traversal path is blocked (403 or 404)', async ({ request }) => {
     const res = await request.get('/../../../etc/passwd');
     expect([403, 404]).toContain(res.status());
+  });
+
+  test('request with suspicious characters is blocked (403)', async ({ request }) => {
+    // Whitelist check happens before normalization/resolution
+    const res = await request.get('/some<file>.js');
+    expect(res.status()).toBe(403);
   });
 
   test('normal static file request still works', async ({ request }) => {
@@ -237,26 +291,49 @@ test.describe('XSS — driveUser and driveAvatar in settings (fix 1)', () => {
 
   test('malicious driveUser is escaped in the settings card', async ({ page }) => {
     await page.addInitScript(() => {
-      localStorage.setItem('at_driveToken', 'fake_token');
-      localStorage.setItem('at_driveTokenExpiry', String(Date.now() + 3600000));
-      localStorage.setItem('at_driveUser', '<img src=x onerror="window.__xss=true">');
-      localStorage.setItem('at_driveAvatar', '');
+      (window as any).Capacitor = {
+        isNativePlatform: () => true,
+        Plugins: { Preferences: {
+          get: ({ key }: { key: string }) => {
+            if (key === 'at_driveToken') return Promise.resolve({ value: 'fake_token' });
+            if (key === 'at_driveTokenExpiry') return Promise.resolve({ value: String(Date.now() + 3600000) });
+            if (key === 'at_driveUser') return Promise.resolve({ value: '<img src=x onerror="window.__xss=true">' });
+            if (key === 'at_driveAvatar') return Promise.resolve({ value: '' });
+            return Promise.resolve({ value: null });
+          },
+          set: () => Promise.resolve()
+        }}
+      };
     });
     await page.goto('/');
     await goToTab(page, 'settings');
-    await expect(page.locator('#page-settings .drive-name')).toContainText('<img');
+    // Settings render is async now, wait for the element
+    const driveName = page.locator('#page-settings .drive-name');
+    await expect(driveName).toBeVisible({ timeout: 5000 });
+    await expect(driveName).toContainText('<img');
     expect(await page.evaluate(() => !!(window as any).__xss)).toBe(false);
   });
 
   test('malicious driveAvatar src is escaped in the settings card', async ({ page }) => {
     await page.addInitScript(() => {
-      localStorage.setItem('at_driveToken', 'fake_token');
-      localStorage.setItem('at_driveTokenExpiry', String(Date.now() + 3600000));
-      localStorage.setItem('at_driveUser', 'user@example.com');
-      localStorage.setItem('at_driveAvatar', '" onerror="window.__xss=true" x="');
+      (window as any).Capacitor = {
+        isNativePlatform: () => true,
+        Plugins: { Preferences: {
+          get: ({ key }: { key: string }) => {
+            if (key === 'at_driveToken') return Promise.resolve({ value: 'fake_token' });
+            if (key === 'at_driveTokenExpiry') return Promise.resolve({ value: String(Date.now() + 3600000) });
+            if (key === 'at_driveUser') return Promise.resolve({ value: 'user@example.com' });
+            if (key === 'at_driveAvatar') return Promise.resolve({ value: '" onerror="window.__xss=true" x="' });
+            return Promise.resolve({ value: null });
+          },
+          set: () => Promise.resolve()
+        }}
+      };
     });
     await page.goto('/');
     await goToTab(page, 'settings');
+    // Wait for async render and any potential XSS execution
+    await page.waitForTimeout(1000);
     expect(await page.evaluate(() => !!(window as any).__xss)).toBe(false);
   });
 
@@ -307,8 +384,8 @@ test.describe('localStorage quota error handled (fix 3)', () => {
 
   test('DB.measures setter does not throw when localStorage is full', async ({ page }) => {
     await page.goto('/');
-    const threw = await page.evaluate(() => {
-      // Simulate QuotaExceededError
+    const threw = await page.evaluate(async () => {
+      // Simulate QuotaExceededError in SecureStore which uses localStorage on web
       const orig = localStorage.setItem.bind(localStorage);
       Storage.prototype.setItem = () => { throw new DOMException('QuotaExceededError'); };
       try {
@@ -325,7 +402,7 @@ test.describe('localStorage quota error handled (fix 3)', () => {
 
   test('DB.reminders setter does not throw when localStorage is full', async ({ page }) => {
     await page.goto('/');
-    const threw = await page.evaluate(() => {
+    const threw = await page.evaluate(async () => {
       const orig = localStorage.setItem.bind(localStorage);
       Storage.prototype.setItem = () => { throw new DOMException('QuotaExceededError'); };
       try {

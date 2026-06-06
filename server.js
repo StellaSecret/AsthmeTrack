@@ -17,17 +17,34 @@ const MIME = {
 };
 
 http.createServer((req, res) => {
+  // Reject URLs with null bytes or other suspicious characters early
+  if (req.url.includes('%00') || req.url.includes('\0')) {
+    res.writeHead(400, { 'Content-Type': 'text/plain' });
+    res.end('Bad Request');
+    return;
+  }
+
   const decodedUrl = decodeURIComponent(req.url);
   // Remove query parameters
   const urlPath = decodedUrl === '/' ? '/index.html' : decodedUrl.split('?')[0];
 
-  // Sanitize path by removing '..' to prevent directory traversal
-  const sanitizedPath = path.normalize(urlPath).replace(/^(\.\.[\/\\])+/, '');
+  // Whitelist allowed characters: alphanumeric, hyphen, underscore, dot, forward slash
+  if (!/^[a-zA-Z0-9\-\_\.\/]+$/.test(urlPath)) {
+    res.writeHead(403, { 'Content-Type': 'text/plain' });
+    res.end('Forbidden: Invalid characters in path');
+    return;
+  }
 
-  // Resolve absolute path
-  const filePath = path.join(ROOT, sanitizedPath);
+  // Prevent suspicious patterns like '..' or '//'
+  if (urlPath.includes('..') || urlPath.includes('//')) {
+    res.writeHead(403, { 'Content-Type': 'text/plain' });
+    res.end('Forbidden: Suspicious path pattern');
+    return;
+  }
 
-  // Security check: ensure the resolved path is within the ROOT directory
+  // Resolve absolute path and ensure it stays within ROOT
+  const filePath = path.resolve(ROOT, urlPath.replace(/^\/+/, ''));
+
   if (!filePath.startsWith(ROOT + path.sep) && filePath !== ROOT) {
     res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
     res.end('Forbidden');

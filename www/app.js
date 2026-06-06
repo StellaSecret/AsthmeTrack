@@ -29,33 +29,71 @@ function esc(s) {
 //  DATA
 // ══════════════════════════════════════════
 const DB = {
-  get measures() { try{return JSON.parse(localStorage.getItem('at_measures')||'[]');}catch(e){return[];} },
-  set measures(v) { try { localStorage.setItem('at_measures',JSON.stringify(v)); } catch(e) { console.error('DB.measures write failed',e); if(e.name==='QuotaExceededError')showToast(t('err_storage'),'error'); } },
-  get bestDEP() { return parseFloat(localStorage.getItem('at_bestDEP')||'450'); },
-  set bestDEP(v) { try { localStorage.setItem('at_bestDEP',v); } catch(e) { console.error('DB.bestDEP write failed',e); if(e.name==='QuotaExceededError')showToast(t('err_storage'),'error'); } },
-  get reminders() { try{return JSON.parse(localStorage.getItem('at_reminders')||'[]');}catch(e){return[];} },
-  set reminders(v) { try { localStorage.setItem('at_reminders',JSON.stringify(v)); } catch(e) { console.error('DB.reminders write failed',e); if(e.name==='QuotaExceededError')showToast(t('err_storage'),'error'); } },
-  get profile() { try{return JSON.parse(localStorage.getItem('at_profile')||'{}');}catch(e){return {};} },
-  set profile(v) { try { localStorage.setItem('at_profile',JSON.stringify(v)); } catch(e) { console.error('DB.profile write failed',e); if(e.name==='QuotaExceededError')showToast(t('err_storage'),'error'); } },
+  _state: {
+    measures: [],
+    bestDEP: 450,
+    reminders: [],
+    profile: {},
+    driveToken: null,
+    driveTokenExpiry: 0,
+    driveFileId: null,
+    driveUser: null,
+    driveAvatar: null
+  },
+  async load() {
+    try {
+      const [m, b, r, p, dt, de, df, du, da] = await Promise.all([
+        SecureStore.load('at_measures'),
+        SecureStore.load('at_bestDEP'),
+        SecureStore.load('at_reminders'),
+        SecureStore.load('at_profile'),
+        SecureStore.load('at_driveToken'),
+        SecureStore.load('at_driveTokenExpiry'),
+        SecureStore.load('at_driveFileId'),
+        SecureStore.load('at_driveUser'),
+        SecureStore.load('at_driveAvatar')
+      ]);
+      this._state.measures = JSON.parse(m || '[]');
+      this._state.bestDEP = parseFloat(b || '450');
+      this._state.reminders = JSON.parse(r || '[]');
+      this._state.profile = JSON.parse(p || '{}');
+      this._state.driveToken = dt || null;
+      this._state.driveTokenExpiry = parseInt(de || '0');
+      this._state.driveFileId = df || null;
+      this._state.driveUser = du || null;
+      this._state.driveAvatar = da || null;
+    } catch(e) { console.error('DB.load failed', e); }
+  },
+  get measures() { return this._state.measures; },
+  set measures(v) { this._state.measures = v; SecureStore.save('at_measures', JSON.stringify(v)); },
+  get bestDEP() { return this._state.bestDEP; },
+  set bestDEP(v) { this._state.bestDEP = v; SecureStore.save('at_bestDEP', String(v)); },
+  get reminders() { return this._state.reminders; },
+  set reminders(v) { this._state.reminders = v; SecureStore.save('at_reminders', JSON.stringify(v)); },
+  get profile() { return this._state.profile; },
+  set profile(v) { this._state.profile = v; SecureStore.save('at_profile', JSON.stringify(v)); },
+
   // ── token fields stay in SecureStore for asynchronous access ──────────
   // On Capacitor the token is persisted in CapacitorPreferences (secure
   // storage backed by EncryptedSharedPreferences on Android / Keychain on iOS).
   // Call SecureStore.save/load at connect & restore time.
-  getDriveToken: async function() { return await SecureStore.load('at_driveToken'); },
+  getDriveToken: async function() { return this._state.driveToken; },
   setDriveToken: async function(v) {
-    // FIX #9 — Do NOT write the OAuth token to plain localStorage.
+    this._state.driveToken = v;
     if (v) { await SecureStore.save('at_driveToken', v); }
     else   { await SecureStore.remove('at_driveToken'); }
   },
-  getDriveTokenExpiry: async function() { return parseInt((await SecureStore.load('at_driveTokenExpiry'))||'0'); },
-  // FIX #9 — Write expiry to SecureStore.
-  setDriveTokenExpiry: async function(v) { await SecureStore.save('at_driveTokenExpiry', String(v)); },
-  get driveFileId() { return localStorage.getItem('at_driveFileId')||null; },
-  set driveFileId(v) { try { v?localStorage.setItem('at_driveFileId',v):localStorage.removeItem('at_driveFileId'); } catch(e) { console.error('DB.driveFileId write failed',e); } },
-  get driveUser() { return localStorage.getItem('at_driveUser')||null; },
-  set driveUser(v) { try { v?localStorage.setItem('at_driveUser',v):localStorage.removeItem('at_driveUser'); } catch(e) { console.error('DB.driveUser write failed',e); } },
-  get driveAvatar() { return localStorage.getItem('at_driveAvatar')||null; },
-  set driveAvatar(v) { try { v?localStorage.setItem('at_driveAvatar',v):localStorage.removeItem('at_driveAvatar'); } catch(e) { console.error('DB.driveAvatar write failed',e); } },
+  getDriveTokenExpiry: async function() { return this._state.driveTokenExpiry; },
+  setDriveTokenExpiry: async function(v) {
+    this._state.driveTokenExpiry = v;
+    await SecureStore.save('at_driveTokenExpiry', String(v));
+  },
+  get driveFileId() { return this._state.driveFileId; },
+  set driveFileId(v) { this._state.driveFileId = v; if (v) SecureStore.save('at_driveFileId', v); else SecureStore.remove('at_driveFileId'); },
+  get driveUser() { return this._state.driveUser; },
+  set driveUser(v) { this._state.driveUser = v; if (v) SecureStore.save('at_driveUser', v); else SecureStore.remove('at_driveUser'); },
+  get driveAvatar() { return this._state.driveAvatar; },
+  set driveAvatar(v) { this._state.driveAvatar = v; if (v) SecureStore.save('at_driveAvatar', v); else SecureStore.remove('at_driveAvatar'); },
 };
 
 // ══════════════════════════════════════════
@@ -1407,9 +1445,11 @@ async function disconnectDrive() {
     const SocialLogin = getSocialLogin();
     if (SocialLogin) await SocialLogin.logout({ provider: 'google' });
   } catch(e) {}
-  ['at_driveToken','at_driveTokenExpiry','at_driveFileId','at_driveUser','at_driveAvatar'].forEach(k => localStorage.removeItem(k));
-  SecureStore.remove('at_driveToken');
-  SecureStore.remove('at_driveTokenExpiry');
+  await DB.setDriveToken(null);
+  await DB.setDriveTokenExpiry(0);
+  DB.driveFileId = null;
+  DB.driveUser = null;
+  DB.driveAvatar = null;
   renderSettings();
   showToast(t('drive_disconnect_toast'));
 }
@@ -1797,6 +1837,7 @@ window.depZone      = depZone;
 window.spo2Zone     = spo2Zone;
 
 document.addEventListener('DOMContentLoaded', async ()=>{
+  await DB.load();
   await SecureStore.init();
   applyTheme(isDark());
   applyFont(isCustomFont()); // re-apply after DOM ready (link element now accessible)
