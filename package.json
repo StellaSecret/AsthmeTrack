@@ -9,6 +9,7 @@
     "test:headed": "playwright test --headed",
     "test:report": "playwright show-report",
     "serve:test": "node server.js",
+    "format:trim": "node scripts/trim-spaces.js",
     "typecheck": "tsc --noEmit"
   },
   "repository": {

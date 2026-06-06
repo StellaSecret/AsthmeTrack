@@ -226,8 +226,8 @@ AsthmeTrack — Politique de confidentialité
 Données collectées : mesures DEP, SpO₂, prises Easyhaler, commentaires.
 
 Stockage : vos données sont stockées localement sur votre appareil.
-Si vous activez la synchronisation Google Drive, vos données sont 
-sauvegardées dans votre propre Google Drive personnel. AsthmeTrack 
+Si vous activez la synchronisation Google Drive, vos données sont
+sauvegardées dans votre propre Google Drive personnel. AsthmeTrack
 n'a pas accès à votre Google Drive.
 
 Partage : aucune donnée n'est partagée avec des tiers.
