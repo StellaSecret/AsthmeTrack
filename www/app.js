@@ -97,21 +97,53 @@ const DB = {
 };
 
 // ══════════════════════════════════════════
-//  SECURE STORAGE  (Capacitor Preferences → localStorage fallback)
+//  SECURE STORAGE  (Capacitor Preferences → IndexedDB fallback)
 //  Wraps @capacitor/preferences so the OAuth token is stored in
 //  EncryptedSharedPreferences (Android) / Keychain (iOS) instead of
-//  plain localStorage.  Falls back transparently on web.
+//  plain localStorage.  Falls back to IndexedDB on web for better
+//  isolation than localStorage.
 // ══════════════════════════════════════════
 const SecureStore = {
+  _db: null,
   _prefs() { return IS_CAPACITOR && window.Capacitor?.Plugins?.Preferences || null; },
+  async _getDB() {
+    if (this._db) return this._db;
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open('AsthmeTrackDB', 1);
+      req.onupgradeneeded = () => req.result.createObjectStore('kv');
+      req.onsuccess = () => { this._db = req.result; resolve(req.result); };
+      req.onerror = () => reject(req.error);
+    });
+  },
   async save(key, value) {
-    try { const p = this._prefs(); if (p) await p.set({ key, value }); else localStorage.setItem(key, value); } catch(e) { console.warn('SecureStore.save', e); }
+    try {
+      const p = this._prefs();
+      if (p) { await p.set({ key, value }); return; }
+      const db = await this._getDB();
+      const tx = db.transaction('kv', 'readwrite');
+      tx.objectStore('kv').put(value, key);
+    } catch(e) { console.warn('SecureStore.save', e); }
   },
   async load(key) {
-    try { const p = this._prefs(); if (p) { const { value } = await p.get({ key }); return value; } else return localStorage.getItem(key); } catch(e) { console.warn('SecureStore.load', e); return null; }
+    try {
+      const p = this._prefs();
+      if (p) { const { value } = await p.get({ key }); return value; }
+      const db = await this._getDB();
+      return new Promise((resolve) => {
+        const req = db.transaction('kv').objectStore('kv').get(key);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => resolve(null);
+      });
+    } catch(e) { console.warn('SecureStore.load', e); return null; }
   },
   async remove(key) {
-    try { const p = this._prefs(); if (p) await p.remove({ key }); else localStorage.removeItem(key); } catch(e) { console.warn('SecureStore.remove', e); }
+    try {
+      const p = this._prefs();
+      if (p) { await p.remove({ key }); return; }
+      const db = await this._getDB();
+      const tx = db.transaction('kv', 'readwrite');
+      tx.objectStore('kv').delete(key);
+    } catch(e) { console.warn('SecureStore.remove', e); }
   },
   /** No longer need init() to copy to localStorage as we now use async accessors */
   async init() {},

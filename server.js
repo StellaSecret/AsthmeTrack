@@ -42,25 +42,35 @@ http.createServer((req, res) => {
     return;
   }
 
-  // Resolve absolute path and ensure it stays within ROOT
-  const filePath = path.resolve(ROOT, urlPath.replace(/^\/+/, ''));
+  // Resolve absolute path
+  const filePath = path.join(ROOT, path.normalize(urlPath).replace(/^(\.\.[\/\\])+/, ''));
 
-  if (!filePath.startsWith(ROOT + path.sep) && filePath !== ROOT) {
+  // Double-check using path.relative to ensure we are within ROOT
+  const relative = path.relative(ROOT, filePath);
+  if (relative.startsWith('..') || path.isAbsolute(relative)) {
     res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
     res.end('Forbidden');
     return;
   }
 
-  fs.readFile(filePath, (err, data) => {
-    if (err) {
-      // FIX #5 — Reflected XSS: respond with text/plain, never echo path into HTML
+  // Ensure file exists and is not a directory
+  fs.stat(filePath, (err, stats) => {
+    if (err || !stats.isFile()) {
       res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
       res.end('Not found');
       return;
     }
-    const ext = path.extname(filePath);
-    res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
-    res.end(data);
+
+    fs.readFile(filePath, (err, data) => {
+      if (err) {
+        res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('Internal Server Error');
+        return;
+      }
+      const ext = path.extname(filePath);
+      res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
+      res.end(data);
+    });
   });
 }).listen(PORT, () => {
   console.log(`AsthmeTrack test server running on http://localhost:${PORT}`);

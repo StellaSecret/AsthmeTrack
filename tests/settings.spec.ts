@@ -5,7 +5,7 @@
  * theme toggle, language switch, and profile/predicted DEP modal.
  */
 import { test, expect } from '@playwright/test';
-import { seedMeasures, seedBestDEP, goToTab, fakeMeasure, waitForToast } from './helpers';
+import { seedMeasures, seedBestDEP, goToTab, fakeMeasure, waitForToast, readFromIDB, clearIDB } from './helpers';
 
 test.describe('Calibration DEP', () => {
 
@@ -16,7 +16,7 @@ test.describe('Calibration DEP', () => {
     await page.locator('button[onclick="saveBestDEP()"]').click();
     const toast = await waitForToast(page);
     expect(toast).toContain('DEP');
-    const stored = await page.evaluate(() => localStorage.getItem('at_bestDEP'));
+    const stored = await readFromIDB(page, 'at_bestDEP');
     expect(stored).toBe('520');
   });
 
@@ -27,7 +27,7 @@ test.describe('Calibration DEP', () => {
     await page.locator('button[onclick="saveBestDEP()"]').click();
     const toast = await waitForToast(page);
     expect(toast).toContain('invalide');
-    const stored = await page.evaluate(() => localStorage.getItem('at_bestDEP'));
+    const stored = await readFromIDB(page, 'at_bestDEP');
     expect(stored).not.toBe('50');
   });
 
@@ -41,9 +41,7 @@ test.describe('Clear all data', () => {
     await goToTab(page, 'settings');
     page.on('dialog', d => d.accept());
     await page.locator('button[onclick="clearAll()"]').click();
-    const measures = await page.evaluate(() =>
-      JSON.parse(localStorage.getItem('at_measures') || '[]')
-    );
+    const measures = JSON.parse(await readFromIDB(page, 'at_measures') || '[]');
     expect(measures).toHaveLength(0);
   });
 
@@ -53,9 +51,7 @@ test.describe('Clear all data', () => {
     await goToTab(page, 'settings');
     page.on('dialog', d => d.dismiss());
     await page.locator('button[onclick="clearAll()"]').click();
-    const measures = await page.evaluate(() =>
-      JSON.parse(localStorage.getItem('at_measures') || '[]')
-    );
+    const measures = JSON.parse(await readFromIDB(page, 'at_measures') || '[]');
     expect(measures).toHaveLength(1);
   });
 
@@ -110,9 +106,7 @@ test.describe('JSON export / import', () => {
       }
     }, backup);
 
-    const measures = await page.evaluate(() =>
-      JSON.parse(localStorage.getItem('at_measures') || '[]')
-    );
+    const measures = JSON.parse(await readFromIDB(page, 'at_measures') || '[]');
     expect(measures).toHaveLength(2);
   });
 
@@ -133,6 +127,7 @@ test.describe('CSV export', () => {
   });
 
   test('export CSV on empty data shows error toast', async ({ page }) => {
+    await clearIDB(page);
     await page.addInitScript(() => localStorage.clear());
     await page.goto('/');
     await goToTab(page, 'settings');
@@ -203,7 +198,7 @@ test.describe('Profile & predicted DEP modal', () => {
     await page.locator('#profileHeight').fill('165');
     await page.locator('#profileModal .btn-secondary').click(); // "Use as best DEP"
     await expect(page.locator('#profileModal')).not.toHaveClass(/open/);
-    const stored = await page.evaluate(() => localStorage.getItem('at_bestDEP'));
+    const stored = await readFromIDB(page, 'at_bestDEP');
     expect(Number(stored)).toBeGreaterThan(0);
   });
 

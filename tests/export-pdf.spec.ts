@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { seedMeasures, seedBestDEP, goToTab, fakeMeasure } from './helpers';
+import { seedMeasures, seedBestDEP, goToTab, fakeMeasure, clearIDB } from './helpers';
 import path from 'path';
 
 test.describe('Export PDF', () => {
@@ -39,10 +39,8 @@ test.describe('Export PDF', () => {
   });
 
   test('export PDF sur données vides affiche un toast d\'erreur', async ({ page }) => {
-    // Vide le localStorage avant navigation
-    await page.addInitScript(() => {
-      localStorage.removeItem('at_measures');
-    });
+    // Vide l'IndexedDB avant navigation
+    await clearIDB(page);
     await page.goto('/');
     await goToTab(page, 'historique');
 

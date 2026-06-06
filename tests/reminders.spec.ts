@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { seedReminders, goToTab, waitForToast } from './helpers';
+import { seedReminders, goToTab, waitForToast, readFromIDB } from './helpers';
 
 test.describe('Rappels — scheduling & notifications', () => {
 
@@ -49,9 +49,7 @@ test.describe('Rappels — scheduling & notifications', () => {
     await page.locator('#reminderLabel').fill('Soir');
     await page.locator('button[onclick="addReminder()"]').click();
 
-    const reminders = await page.evaluate(() =>
-      JSON.parse(localStorage.getItem('at_reminders') || '[]')
-    );
+    const reminders = JSON.parse(await readFromIDB(page, 'at_reminders') || '[]');
     expect(reminders).toHaveLength(1);
     expect(reminders[0].time).toBe('20:00');
     expect(reminders[0].label).toBe('Soir');
@@ -70,9 +68,7 @@ test.describe('Rappels — scheduling & notifications', () => {
     await toggleLabel.waitFor({ state: 'visible' });
     await toggleLabel.click();
 
-    const reminders = await page.evaluate(() =>
-      JSON.parse(localStorage.getItem('at_reminders') || '[]')
-    );
+    const reminders = JSON.parse(await readFromIDB(page, 'at_reminders') || '[]');
     expect(reminders[0].active).toBe(false);
   });
 
@@ -88,9 +84,7 @@ test.describe('Rappels — scheduling & notifications', () => {
     await page.locator('.reminder-del').first().click();
     await expect(page.locator('.reminder-item')).toHaveCount(1);
 
-    const reminders = await page.evaluate(() =>
-      JSON.parse(localStorage.getItem('at_reminders') || '[]')
-    );
+    const reminders = JSON.parse(await readFromIDB(page, 'at_reminders') || '[]');
     expect(reminders).toHaveLength(1);
   });
 

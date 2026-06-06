@@ -4,6 +4,7 @@ import {
   seedLang, seedTheme, seedFont,
   goToTab, addMeasure, waitForToast,
   fakeMeasure, fakeMeasureSequence,
+  readFromIDB, clearIDB
 } from './helpers';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -32,6 +33,7 @@ test.describe('Smoke & navigation', () => {
   });
 
   test('empty dashboard shows empty-state', async ({ page }) => {
+    await clearIDB(page);
     await page.addInitScript(() => localStorage.clear());
     await page.goto('/');
     await page.waitForSelector('#dashboardContent .empty-state');
@@ -153,6 +155,7 @@ test.describe('History', () => {
   });
 
   test('empty history shows CTA button that navigates to measure form', async ({ page }) => {
+    await clearIDB(page);
     await page.addInitScript(() => localStorage.clear());
     await page.goto('/');
     await goToTab(page, 'historique');
@@ -173,9 +176,7 @@ test.describe('History', () => {
     await page.locator('#editDep2').fill('420');
     await page.locator('#editDep3').fill('420');
     await page.locator('#editModal .btn-primary').click();
-    const measures = await page.evaluate(() =>
-      JSON.parse(localStorage.getItem('at_measures') || '[]')
-    );
+    const measures = JSON.parse(await readFromIDB(page, 'at_measures') || '[]');
     expect(measures[0].dep).toBe(420);
   });
 
@@ -370,7 +371,7 @@ test.describe('Settings — best DEP & reminders', () => {
     await goToTab(page, 'settings');
     await page.locator('#bestDEPInput').fill('480');
     await page.locator('#page-settings button.btn-primary').click();
-    const saved = await page.evaluate(() => localStorage.getItem('at_bestDEP'));
+    const saved = await readFromIDB(page, 'at_bestDEP');
     expect(Number(saved)).toBe(480);
   });
 
@@ -389,7 +390,7 @@ test.describe('Settings — best DEP & reminders', () => {
     await goToTab(page, 'settings');
     page.on('dialog', d => d.accept());
     await page.locator('button.btn-secondary', { hasText: /Effacer|Delete/ }).click();
-    const measures = await page.evaluate(() => localStorage.getItem('at_measures'));
+    const measures = await readFromIDB(page, 'at_measures');
     expect(JSON.parse(measures || '[]')).toHaveLength(0);
   });
 
@@ -399,9 +400,7 @@ test.describe('Settings — best DEP & reminders', () => {
     await page.locator('#reminderTime').fill('08:30');
     await page.locator('#reminderLabel').fill('Matin');
     await page.locator('button.btn-secondary', { hasText: /Ajouter|Add/ }).click();
-    const reminders = await page.evaluate(() =>
-      JSON.parse(localStorage.getItem('at_reminders') || '[]')
-    );
+    const reminders = JSON.parse(await readFromIDB(page, 'at_reminders') || '[]');
     expect(reminders).toHaveLength(1);
     expect(reminders[0].time).toBe('08:30');
   });
@@ -419,9 +418,7 @@ test.describe('Settings — best DEP & reminders', () => {
     await page.goto('/');
     await goToTab(page, 'settings');
     await page.locator('.reminder-del').first().click();
-    const reminders = await page.evaluate(() =>
-      JSON.parse(localStorage.getItem('at_reminders') || '[]')
-    );
+    const reminders = JSON.parse(await readFromIDB(page, 'at_reminders') || '[]');
     expect(reminders).toHaveLength(0);
   });
 
@@ -491,7 +488,7 @@ test.describe('Settings — predicted DEP profile modal', () => {
     // wait for result to render with the button
     await page.waitForSelector('#profileResult button');
     await page.locator('#profileResult button').click();
-    const saved = await page.evaluate(() => localStorage.getItem('at_bestDEP'));
+    const saved = await readFromIDB(page, 'at_bestDEP');
     expect(Number(saved)).toBeGreaterThan(0);
   });
 
@@ -502,9 +499,7 @@ test.describe('Settings — predicted DEP profile modal', () => {
     await page.locator('#profileSex').selectOption('F');
     await page.locator('#profileAge').fill('45');
     await page.locator('#profileHeight').fill('165');
-    const profile = await page.evaluate(() =>
-      JSON.parse(localStorage.getItem('at_profile') || '{}')
-    );
+    const profile = JSON.parse(await readFromIDB(page, 'at_profile') || '{}');
     expect(profile.sex).toBe('F');
     expect(profile.age).toBe(45);
     expect(profile.height).toBe(165);
@@ -518,6 +513,7 @@ test.describe('Settings — predicted DEP profile modal', () => {
 test.describe('i18n — language switch', () => {
 
   test('default language is French', async ({ page }) => {
+    await clearIDB(page);
     await page.addInitScript(() => localStorage.clear());
     await page.goto('/');
     await page.waitForSelector('#dashboardContent');
@@ -561,6 +557,7 @@ test.describe('i18n — language switch', () => {
   });
 
   test('switching to EN translates empty history state', async ({ page }) => {
+    await clearIDB(page);
     await page.addInitScript(() => localStorage.clear());
     await seedLang(page, 'en');
     await page.goto('/');
@@ -576,6 +573,7 @@ test.describe('i18n — language switch', () => {
 test.describe('Theme toggle', () => {
 
   test('default theme is dark (data-theme=dark)', async ({ page }) => {
+    await clearIDB(page);
     await page.addInitScript(() => localStorage.clear());
     await page.goto('/');
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
@@ -619,6 +617,7 @@ test.describe('Theme toggle', () => {
 test.describe('Font toggle', () => {
 
   test('default font is system (DM Mono link disabled)', async ({ page }) => {
+    await clearIDB(page);
     await page.addInitScript(() => localStorage.clear());
     await page.goto('/');
     const disabled = await page.locator('#dmMonoLink').getAttribute('disabled');
@@ -767,14 +766,10 @@ test.describe('JSON export / import', () => {
       buffer: Buffer.from(payload),
     });
     await expect(page.locator('#toast.show')).toBeVisible();
-    const measures = await page.evaluate(() =>
-      JSON.parse(localStorage.getItem('at_measures') || '[]')
-    );
+    const measures = JSON.parse(await readFromIDB(page, 'at_measures') || '[]');
     expect(measures).toHaveLength(1);
     expect(measures[0].dep).toBe(375);
-    const profile = await page.evaluate(() =>
-      JSON.parse(localStorage.getItem('at_profile') || '{}')
-    );
+    const profile = JSON.parse(await readFromIDB(page, 'at_profile') || '{}');
     expect(profile.sex).toBe('F');
   });
 
@@ -817,6 +812,7 @@ test.describe('CSV export', () => {
   });
 
   test('CSV export with no data shows error toast', async ({ page }) => {
+    await clearIDB(page);
     await page.addInitScript(() => localStorage.clear());
     await page.goto('/');
     await goToTab(page, 'settings');

@@ -1,38 +1,68 @@
 import { Page } from '@playwright/test';
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  SEED HELPERS  — inject data into localStorage before page load
+//  SEED HELPERS  — inject data into IndexedDB before page load
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Injects measures into localStorage (sorted newest-first, matching DB behaviour). */
-export async function seedMeasures(page: Page, measures: object[]) {
-  await page.addInitScript((data) => {
-    const sorted = [...data].sort((a: any, b: any) =>
-      new Date(b.dt).getTime() - new Date(a.dt).getTime()
-    );
-    localStorage.setItem('at_measures', JSON.stringify(sorted));
-  }, measures);
+/** Helper to write to IndexedDB kv store */
+async function writeToIDB(page: Page, key: string, value: any) {
+  await page.addInitScript(({ key, value }) => {
+    const req = indexedDB.open('AsthmeTrackDB', 1);
+    req.onupgradeneeded = () => req.result.createObjectStore('kv');
+    req.onsuccess = () => {
+      const db = req.result;
+      const tx = db.transaction('kv', 'readwrite');
+      tx.objectStore('kv').put(value, key);
+    };
+  }, { key, value });
 }
 
-/** Injects reminders into localStorage. */
+/** Helper to wipe IndexedDB */
+export async function clearIDB(page: Page) {
+  await page.addInitScript(() => {
+    indexedDB.deleteDatabase('AsthmeTrackDB');
+  });
+}
+
+/** Helper to read from IndexedDB kv store */
+export async function readFromIDB(page: Page, key: string): Promise<any> {
+  return await page.evaluate(async (k) => {
+    return new Promise((resolve) => {
+      const req = indexedDB.open('AsthmeTrackDB', 1);
+      req.onsuccess = () => {
+        const db = req.result;
+        try {
+          const getReq = db.transaction('kv').objectStore('kv').get(k);
+          getReq.onsuccess = () => resolve(getReq.result);
+          getReq.onerror = () => resolve(null);
+        } catch(e) { resolve(null); }
+      };
+      req.onerror = () => resolve(null);
+    });
+  }, key);
+}
+
+/** Injects measures into IndexedDB (sorted newest-first, matching DB behaviour). */
+export async function seedMeasures(page: Page, measures: object[]) {
+  const sorted = [...measures].sort((a: any, b: any) =>
+    new Date(b.dt).getTime() - new Date(a.dt).getTime()
+  );
+  await writeToIDB(page, 'at_measures', JSON.stringify(sorted));
+}
+
+/** Injects reminders into IndexedDB. */
 export async function seedReminders(page: Page, reminders: object[]) {
-  await page.addInitScript((data) => {
-    localStorage.setItem('at_reminders', JSON.stringify(data));
-  }, reminders);
+  await writeToIDB(page, 'at_reminders', JSON.stringify(reminders));
 }
 
 /** Injects personal best DEP. */
 export async function seedBestDEP(page: Page, value: number) {
-  await page.addInitScript((v) => {
-    localStorage.setItem('at_bestDEP', String(v));
-  }, value);
+  await writeToIDB(page, 'at_bestDEP', String(value));
 }
 
 /** Injects patient profile (sex, age, height). */
 export async function seedProfile(page: Page, profile: { sex: string; age: number; height: number }) {
-  await page.addInitScript((p) => {
-    localStorage.setItem('at_profile', JSON.stringify(p));
-  }, profile);
+  await writeToIDB(page, 'at_profile', JSON.stringify(profile));
 }
 
 /** Sets language preference before page load. */
