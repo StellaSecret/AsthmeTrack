@@ -1002,7 +1002,7 @@ function renderDashboard(){
 
   // Crisis banner — static i18n text only, safe innerHTML
   if(crisis){
-    cont.innerHTML+=`<div class="crisis-banner"><div class="crisis-banner-icon">🚨</div><div class="crisis-banner-text"><div class="crisis-banner-title">${t('crisis_title')}</div><div class="crisis-banner-sub">${t('crisis_sub')}</div></div></div>`;
+    cont.insertAdjacentHTML('beforeend', `<div class="crisis-banner"><div class="crisis-banner-icon">🚨</div><div class="crisis-banner-text"><div class="crisis-banner-title">${t('crisis_title')}</div><div class="crisis-banner-sub">${t('crisis_sub')}</div></div></div>`);
   }
 
   // Active reminders — user data: use textContent
@@ -1031,7 +1031,8 @@ function renderDashboard(){
   const depBox=document.createElement('div');depBox.className=`metric-box ${dz}`;
   const depLabel=document.createElement('div');depLabel.className='metric-label';depLabel.textContent=t('db_dep_avg');
   const depVal=document.createElement('div');depVal.className='metric-value';
-  depVal.textContent=last.dep;depVal.innerHTML+=trendArrow(depTrend,'dep'); // trendArrow returns safe static HTML
+  depVal.textContent=last.dep;
+  depVal.insertAdjacentHTML('beforeend', trendArrow(depTrend,'dep')); // trendArrow returns safe static HTML
   const depUnit=document.createElement('div');depUnit.className='metric-unit';depUnit.textContent='L/min';
   const depPctEl=document.createElement('div');depPctEl.className='metric-pct';depPctEl.textContent=`${depPct}% ${t('db_best_pct')}`;
   depBox.appendChild(depLabel);depBox.appendChild(depVal);depBox.appendChild(depUnit);depBox.appendChild(depPctEl);
@@ -1040,7 +1041,8 @@ function renderDashboard(){
   const spo2Box=document.createElement('div');spo2Box.className=`metric-box ${sz}`;
   const spo2Label=document.createElement('div');spo2Label.className='metric-label';spo2Label.textContent='SpO₂';
   const spo2Val=document.createElement('div');spo2Val.className='metric-value';
-  spo2Val.textContent=last.spo2;spo2Val.innerHTML+=trendArrow(spo2Trend,'spo2');
+  spo2Val.textContent=last.spo2;
+  spo2Val.insertAdjacentHTML('beforeend', trendArrow(spo2Trend,'spo2'));
   const spo2Unit=document.createElement('div');spo2Unit.className='metric-unit';spo2Unit.textContent='%';
   spo2Box.appendChild(spo2Label);spo2Box.appendChild(spo2Val);spo2Box.appendChild(spo2Unit);
 
@@ -1063,8 +1065,8 @@ function renderDashboard(){
   cont.appendChild(card);
 
   // Chart cards — static structure, safe innerHTML
-  cont.innerHTML+=`<div class="card"><div class="card-title">${t('db_dep_chart')}</div><div class="chart-wrap"><canvas id="chartDEP"></canvas></div></div>`;
-  cont.innerHTML+=`<div class="card"><div class="card-title">${t('db_spo2_chart')}</div><div class="chart-wrap"><canvas id="chartSPO2"></canvas></div></div>`;
+  cont.insertAdjacentHTML('beforeend', `<div class="card"><div class="card-title">${t('db_dep_chart')}</div><div class="chart-wrap"><canvas id="chartDEP"></canvas></div></div>`);
+  cont.insertAdjacentHTML('beforeend', `<div class="card"><div class="card-title">${t('db_spo2_chart')}</div><div class="chart-wrap"><canvas id="chartSPO2"></canvas></div></div>`);
 
   drawLineChart('chartDEP',labels,recent.map(m=>m.dep),'#4f9cf9',50,700);
   drawLineChart('chartSPO2',labels,recent.map(m=>m.spo2),'#10d9a0',85,100);
@@ -1693,7 +1695,7 @@ function renderSettings(){
         <div><div class="setting-label">${t('settings_profile_label')}</div><div class="setting-sub">${t('settings_profile_sub')}</div></div>
         <button class="btn-secondary" onclick="openProfileModal()">${t('btn_profile_open')}</button>
       </div>
-      <div class="field" style="margin-top:12px"><label>${t('settings_dep_label')}</label><input type="number" id="bestDEPInput" value="${DB.bestDEP}" min="100" max="900"/></div>
+      <div class="field" style="margin-top:12px"><label>${t('settings_dep_label')}</label><input type="number" id="bestDEPInput" value="${esc(DB.bestDEP)}" min="100" max="900"/></div>
       <button class="btn-primary" onclick="saveBestDEP()">${t('btn_save_dep')}</button>
     </div>
 
