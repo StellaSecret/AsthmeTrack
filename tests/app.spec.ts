@@ -7,6 +7,15 @@ import {
   readFromIDB, clearIDB
 } from './helpers';
 
+test.beforeEach(async ({ page }, testInfo) => {
+  const dbName = `AsthmeTrackDB_worker_${testInfo.workerIndex}`;
+  await page.addInitScript((name) => localStorage.setItem('__TEST_DB_NAME__', name), dbName);
+  await clearIDB(page, dbName);
+  await page.addInitScript(() => localStorage.clear());
+  // Re-set it after clear
+  await page.addInitScript((name) => localStorage.setItem('__TEST_DB_NAME__', name), dbName);
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  SMOKE & NAVIGATION
 // ─────────────────────────────────────────────────────────────────────────────
@@ -33,8 +42,6 @@ test.describe('Smoke & navigation', () => {
   });
 
   test('empty dashboard shows empty-state', async ({ page }) => {
-    await clearIDB(page);
-    await page.addInitScript(() => localStorage.clear());
     await page.goto('/');
     await page.waitForSelector('#dashboardContent .empty-state');
     await expect(page.locator('.empty-state')).toBeVisible();
@@ -155,8 +162,6 @@ test.describe('History', () => {
   });
 
   test('empty history shows CTA button that navigates to measure form', async ({ page }) => {
-    await clearIDB(page);
-    await page.addInitScript(() => localStorage.clear());
     await page.goto('/');
     await goToTab(page, 'historique');
     const cta = page.locator('.empty-state-cta');
@@ -212,6 +217,55 @@ test.describe('History', () => {
     await page.goto('/');
     await goToTab(page, 'historique');
     await expect(page.locator('.history-swipe-bg').first()).toBeAttached();
+  });
+
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  HISTORY PAGINATION (#10)
+// ─────────────────────────────────────────────────────────────────────────────
+test.describe('History Pagination', () => {
+
+  test('load more button appears and loads next page', async ({ page }) => {
+    // Seed 45 measures (HISTORY_PAGE_SIZE is 30)
+    const measures = Array.from({ length: 45 }, (_, i) => fakeMeasure({ id: i, dt: new Date(Date.now() - i * 3600000).toISOString() }));
+    await seedMeasures(page, measures);
+    await page.goto('/');
+    await goToTab(page, 'historique');
+
+    // Should show 30 items initially
+    await expect(page.locator('.history-item')).toHaveCount(30);
+
+    // Button should show "Afficher plus (15)" or "Load more (15)"
+    const loadBtn = page.locator('button.btn-secondary', { hasText: /Afficher plus|Load more/ });
+    await expect(loadBtn).toBeVisible();
+    await expect(loadBtn).toContainText('15');
+
+    // Click to load more
+    await loadBtn.click();
+    await expect(page.locator('.history-item')).toHaveCount(45);
+    await expect(loadBtn).not.toBeVisible();
+  });
+
+  test('page reset on delete ensures consistent view', async ({ page }) => {
+    // Seed 35 measures. Page 1 shows 30.
+    const measures = Array.from({ length: 35 }, (_, i) => fakeMeasure({ id: i, dt: new Date(Date.now() - i * 3600000).toISOString() }));
+    await seedMeasures(page, measures);
+    await page.goto('/');
+    await goToTab(page, 'historique');
+
+    // Click load more to show all 35
+    await page.locator('button.btn-secondary', { hasText: /Afficher plus|Load more/ }).click();
+    await expect(page.locator('.history-item')).toHaveCount(35);
+
+    // Delete one item
+    page.on('dialog', d => d.accept());
+    await page.locator('.history-item .icon-action-btn.del').first().click();
+
+    // After delete, the list should be re-rendered and reset to page 1 size (30)
+    await expect(page.locator('.history-item')).toHaveCount(30);
+    // Button should now show "Afficher plus (4)"
+    await expect(page.locator('button.btn-secondary', { hasText: /Afficher plus|Load more/ })).toContainText('4');
   });
 
 });
@@ -311,7 +365,7 @@ test.describe('Dashboard — trend arrows', () => {
       // previous 3 days: low DEP
       ...Array.from({ length: 3 }, (_, i) => fakeMeasure({
         id: now - 10000 + i, dep: 300,
-        dt: new Date(now - (4 + i) * 24 * 3600 * 1000).toISOString(),
+        dt: new Date(now - (3 + i) * 24 * 3600 * 1000).toISOString(),
       })),
     ];
     await seedMeasures(page, measures);
@@ -330,7 +384,7 @@ test.describe('Dashboard — trend arrows', () => {
       })),
       ...Array.from({ length: 3 }, (_, i) => fakeMeasure({
         id: now - 10000 + i, dep: 420,
-        dt: new Date(now - (4 + i) * 24 * 3600 * 1000).toISOString(),
+        dt: new Date(now - (3 + i) * 24 * 3600 * 1000).toISOString(),
       })),
     ];
     await seedMeasures(page, measures);
@@ -349,7 +403,7 @@ test.describe('Dashboard — trend arrows', () => {
       })),
       ...Array.from({ length: 3 }, (_, i) => fakeMeasure({
         id: now - 10000 + i, dep: 400,
-        dt: new Date(now - (4 + i) * 24 * 3600 * 1000).toISOString(),
+        dt: new Date(now - (3 + i) * 24 * 3600 * 1000).toISOString(),
       })),
     ];
     await seedMeasures(page, measures);
@@ -513,8 +567,6 @@ test.describe('Settings — predicted DEP profile modal', () => {
 test.describe('i18n — language switch', () => {
 
   test('default language is French', async ({ page }) => {
-    await clearIDB(page);
-    await page.addInitScript(() => localStorage.clear());
     await page.goto('/');
     await page.waitForSelector('#dashboardContent');
     await expect(page.locator('html')).toHaveAttribute('lang', 'fr');
@@ -557,8 +609,6 @@ test.describe('i18n — language switch', () => {
   });
 
   test('switching to EN translates empty history state', async ({ page }) => {
-    await clearIDB(page);
-    await page.addInitScript(() => localStorage.clear());
     await seedLang(page, 'en');
     await page.goto('/');
     await goToTab(page, 'historique');
@@ -573,8 +623,6 @@ test.describe('i18n — language switch', () => {
 test.describe('Theme toggle', () => {
 
   test('default theme is dark (data-theme=dark)', async ({ page }) => {
-    await clearIDB(page);
-    await page.addInitScript(() => localStorage.clear());
     await page.goto('/');
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   });
@@ -617,8 +665,6 @@ test.describe('Theme toggle', () => {
 test.describe('Font toggle', () => {
 
   test('default font is system (DM Mono link disabled)', async ({ page }) => {
-    await clearIDB(page);
-    await page.addInitScript(() => localStorage.clear());
     await page.goto('/');
     const disabled = await page.locator('#dmMonoLink').getAttribute('disabled');
     // attribute present means disabled
@@ -812,8 +858,6 @@ test.describe('CSV export', () => {
   });
 
   test('CSV export with no data shows error toast', async ({ page }) => {
-    await clearIDB(page);
-    await page.addInitScript(() => localStorage.clear());
     await page.goto('/');
     await goToTab(page, 'settings');
     await page.locator('button.btn-secondary', { hasText: /CSV/ }).click();

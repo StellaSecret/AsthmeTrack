@@ -1,5 +1,13 @@
 import { test, expect } from '@playwright/test';
-import { seedReminders, goToTab, waitForToast, readFromIDB } from './helpers';
+import { seedReminders, goToTab, waitForToast, readFromIDB, clearIDB } from './helpers';
+
+test.beforeEach(async ({ page }, testInfo) => {
+  const dbName = `AsthmeTrackDB_worker_${testInfo.workerIndex}`;
+  await page.addInitScript((name) => localStorage.setItem('__TEST_DB_NAME__', name), dbName);
+  await clearIDB(page, dbName);
+  await page.addInitScript(() => localStorage.clear());
+  await page.addInitScript((name) => localStorage.setItem('__TEST_DB_NAME__', name), dbName);
+});
 
 test.describe('Rappels — scheduling & notifications', () => {
 
@@ -37,7 +45,7 @@ test.describe('Rappels — scheduling & notifications', () => {
     await goToTab(page, 'settings');
     await page.locator('#reminderTime').fill('08:30');
     await page.locator('#reminderLabel').fill('Matin');
-    await page.locator('button[onclick="addReminder()"]').click();
+    await page.locator('button[data-action="addReminder"]').click();
     await expect(page.locator('.reminder-time')).toContainText('08:30');
     await expect(page.locator('.reminder-label-text')).toContainText('Matin');
   });
@@ -47,7 +55,7 @@ test.describe('Rappels — scheduling & notifications', () => {
     await goToTab(page, 'settings');
     await page.locator('#reminderTime').fill('20:00');
     await page.locator('#reminderLabel').fill('Soir');
-    await page.locator('button[onclick="addReminder()"]').click();
+    await page.locator('button[data-action="addReminder"]').click();
 
     const reminders = JSON.parse(await readFromIDB(page, 'at_reminders') || '[]');
     expect(reminders).toHaveLength(1);
@@ -92,7 +100,7 @@ test.describe('Rappels — scheduling & notifications', () => {
     await page.goto('/');
     await goToTab(page, 'settings');
     await page.locator('#reminderLabel').fill('Sans heure');
-    await page.locator('button[onclick="addReminder()"]').click();
+    await page.locator('button[data-action="addReminder"]').click();
     const toast = await waitForToast(page);
     expect(toast).toContain('heure');
   });

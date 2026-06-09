@@ -4,42 +4,75 @@ import { Page } from '@playwright/test';
 //  SEED HELPERS  — inject data into IndexedDB before page load
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Ensures we are on the app origin before IDB operations */
+async function ensureOrigin(page: Page) {
+  const url = page.url();
+  if (url === 'about:blank' || !url.includes('localhost:3333')) {
+    await page.goto('/');
+  }
+}
+
 /** Helper to write to IndexedDB kv store */
 async function writeToIDB(page: Page, key: string, value: any) {
-  await page.addInitScript(({ key, value }) => {
-    const req = indexedDB.open('AsthmeTrackDB', 1);
-    req.onupgradeneeded = () => req.result.createObjectStore('kv');
-    req.onsuccess = () => {
-      const db = req.result;
-      const tx = db.transaction('kv', 'readwrite');
-      tx.objectStore('kv').put(value, key);
-    };
-  }, { key, value });
+  await ensureOrigin(page);
+  const dbName = await page.evaluate(() => localStorage.getItem('__TEST_DB_NAME__') || 'AsthmeTrackDB');
+  await page.evaluate(async ({ key, value, dbName }) => {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(dbName, 1);
+      req.onupgradeneeded = () => req.result.createObjectStore('kv');
+      req.onsuccess = () => {
+        const db = req.result;
+        const tx = db.transaction('kv', 'readwrite');
+        tx.objectStore('kv').put(value, key);
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onerror = () => { db.close(); reject(tx.error); };
+      };
+      req.onerror = () => reject(req.error);
+    });
+  }, { key, value, dbName });
 }
 
 /** Helper to wipe IndexedDB */
-export async function clearIDB(page: Page) {
-  await page.addInitScript(() => {
-    indexedDB.deleteDatabase('AsthmeTrackDB');
-  });
+export async function clearIDB(page: Page, name?: string) {
+  await ensureOrigin(page);
+  const dbName = name || await page.evaluate(() => localStorage.getItem('__TEST_DB_NAME__') || 'AsthmeTrackDB');
+  await page.evaluate(async (name) => {
+    return new Promise((resolve) => {
+      const req = indexedDB.open(name, 1);
+      req.onupgradeneeded = () => req.result.createObjectStore('kv');
+      req.onsuccess = () => {
+        const db = req.result;
+        try {
+          const tx = db.transaction('kv', 'readwrite');
+          tx.objectStore('kv').clear();
+          tx.oncomplete = () => { db.close(); resolve(); };
+          tx.onerror = () => { db.close(); resolve(); };
+        } catch(e) { db.close(); resolve(); }
+      };
+      req.onerror = () => resolve();
+    });
+  }, dbName);
 }
 
 /** Helper to read from IndexedDB kv store */
 export async function readFromIDB(page: Page, key: string): Promise<any> {
-  return await page.evaluate(async (k) => {
+  await ensureOrigin(page);
+  const dbName = await page.evaluate(() => localStorage.getItem('__TEST_DB_NAME__') || 'AsthmeTrackDB');
+  return await page.evaluate(async ({ k, name }) => {
     return new Promise((resolve) => {
-      const req = indexedDB.open('AsthmeTrackDB', 1);
+      const req = indexedDB.open(name, 1);
+      req.onupgradeneeded = () => req.result.createObjectStore('kv'); // Ensure store exists
       req.onsuccess = () => {
         const db = req.result;
         try {
           const getReq = db.transaction('kv').objectStore('kv').get(k);
-          getReq.onsuccess = () => resolve(getReq.result);
-          getReq.onerror = () => resolve(null);
-        } catch(e) { resolve(null); }
+          getReq.onsuccess = () => { db.close(); resolve(getReq.result); };
+          getReq.onerror = () => { db.close(); resolve(null); };
+        } catch(e) { db.close(); resolve(null); }
       };
       req.onerror = () => resolve(null);
     });
-  }, key);
+  }, { k: key, name: dbName });
 }
 
 /** Injects measures into IndexedDB (sorted newest-first, matching DB behaviour). */
@@ -92,7 +125,7 @@ export async function seedFont(page: Page, font: 'system' | 'custom') {
 
 /** Navigates to a tab via the nav bar. */
 export async function goToTab(page: Page, tab: 'dashboard' | 'saisie' | 'historique' | 'settings') {
-  await page.locator(`nav .nav-btn[onclick*="'${tab}'"]`).click();
+  await page.locator(`nav .nav-btn[data-val="${tab}"]`).click();
   await page.waitForSelector(`#page-${tab}.active`);
 }
 

@@ -7,13 +7,22 @@
 import { test, expect } from '@playwright/test';
 import { seedMeasures, seedBestDEP, goToTab, fakeMeasure, waitForToast, readFromIDB, clearIDB } from './helpers';
 
+test.beforeEach(async ({ page }, testInfo) => {
+  const dbName = `AsthmeTrackDB_worker_${testInfo.workerIndex}`;
+  await page.addInitScript((name) => localStorage.setItem('__TEST_DB_NAME__', name), dbName);
+  await clearIDB(page, dbName);
+  await page.addInitScript(() => localStorage.clear());
+  // Re-set it after clear
+  await page.addInitScript((name) => localStorage.setItem('__TEST_DB_NAME__', name), dbName);
+});
+
 test.describe('Calibration DEP', () => {
 
   test('saving a valid bestDEP persists it and shows a toast', async ({ page }) => {
     await page.goto('/');
     await goToTab(page, 'settings');
     await page.locator('#bestDEPInput').fill('520');
-    await page.locator('button[onclick="saveBestDEP()"]').click();
+    await page.locator('button[data-action="saveBestDEP"]').click();
     const toast = await waitForToast(page);
     expect(toast).toContain('DEP');
     const stored = await readFromIDB(page, 'at_bestDEP');
@@ -24,7 +33,7 @@ test.describe('Calibration DEP', () => {
     await page.goto('/');
     await goToTab(page, 'settings');
     await page.locator('#bestDEPInput').fill('50'); // below min 100
-    await page.locator('button[onclick="saveBestDEP()"]').click();
+    await page.locator('button[data-action="saveBestDEP"]').click();
     const toast = await waitForToast(page);
     expect(toast).toContain('invalide');
     const stored = await readFromIDB(page, 'at_bestDEP');
@@ -40,7 +49,7 @@ test.describe('Clear all data', () => {
     await page.goto('/');
     await goToTab(page, 'settings');
     page.on('dialog', d => d.accept());
-    await page.locator('button[onclick="clearAll()"]').click();
+    await page.locator('button[data-action="clearAll"]').click();
     const measures = JSON.parse(await readFromIDB(page, 'at_measures') || '[]');
     expect(measures).toHaveLength(0);
   });
@@ -50,7 +59,7 @@ test.describe('Clear all data', () => {
     await page.goto('/');
     await goToTab(page, 'settings');
     page.on('dialog', d => d.dismiss());
-    await page.locator('button[onclick="clearAll()"]').click();
+    await page.locator('button[data-action="clearAll"]').click();
     const measures = JSON.parse(await readFromIDB(page, 'at_measures') || '[]');
     expect(measures).toHaveLength(1);
   });
@@ -65,7 +74,7 @@ test.describe('JSON export / import', () => {
     await goToTab(page, 'settings');
     const [download] = await Promise.all([
       page.waitForEvent('download'),
-      page.locator('button[onclick="exportJSON()"]').click(),
+      page.locator('button[data-action="exportJSON"]').click(),
     ]);
     expect(download.suggestedFilename()).toMatch(/^asthmetrack_backup_\d{4}-\d{2}-\d{2}\.json$/);
   });
@@ -121,17 +130,15 @@ test.describe('CSV export', () => {
     await goToTab(page, 'settings');
     const [download] = await Promise.all([
       page.waitForEvent('download'),
-      page.locator('button[onclick="exportCSV()"]').click(),
+      page.locator('button[data-action="exportCSV"]').click(),
     ]);
     expect(download.suggestedFilename()).toMatch(/^asthmetrack_\d{4}-\d{2}-\d{2}\.csv$/);
   });
 
   test('export CSV on empty data shows error toast', async ({ page }) => {
-    await clearIDB(page);
-    await page.addInitScript(() => localStorage.clear());
     await page.goto('/');
     await goToTab(page, 'settings');
-    await page.locator('button[onclick="exportCSV()"]').click();
+    await page.locator('button[data-action="exportCSV"]').click();
     const toast = await waitForToast(page);
     expect(toast).toContain('donnée');
   });
@@ -153,7 +160,7 @@ test.describe('Appearance — theme and language', () => {
   test('switching to English updates nav labels', async ({ page }) => {
     await page.goto('/');
     await goToTab(page, 'settings');
-    await page.locator('button[onclick="setLang(\'en\')"]').click();
+    await page.locator('button[data-action="setLang"][data-val="en"]').click();
     // Nav label for history tab should now be 'History'
     await expect(page.locator('nav .nav-btn').nth(2)).toContainText('History');
   });
@@ -162,7 +169,7 @@ test.describe('Appearance — theme and language', () => {
     await page.addInitScript(() => localStorage.setItem('at_lang', 'en'));
     await page.goto('/');
     await goToTab(page, 'settings');
-    await page.locator('button[onclick="setLang(\'fr\')"]').click();
+    await page.locator('button[data-action="setLang"][data-val="fr"]').click();
     await expect(page.locator('nav .nav-btn').nth(2)).toContainText('Historique');
   });
 
@@ -173,14 +180,14 @@ test.describe('Profile & predicted DEP modal', () => {
   test('opening the profile modal shows it', async ({ page }) => {
     await page.goto('/');
     await goToTab(page, 'settings');
-    await page.locator('button[onclick="openProfileModal()"]').click();
+    await page.locator('button[data-action="openProfileModal"]').click();
     await expect(page.locator('#profileModal')).toHaveClass(/open/);
   });
 
   test('valid profile inputs compute a predicted DEP', async ({ page }) => {
     await page.goto('/');
     await goToTab(page, 'settings');
-    await page.locator('button[onclick="openProfileModal()"]').click();
+    await page.locator('button[data-action="openProfileModal"]').click();
     await page.locator('#profileSex').selectOption('M');
     await page.locator('#profileAge').fill('35');
     await page.locator('#profileHeight').fill('175');
@@ -192,7 +199,7 @@ test.describe('Profile & predicted DEP modal', () => {
   test('"Use as best DEP" updates bestDEP and closes modal', async ({ page }) => {
     await page.goto('/');
     await goToTab(page, 'settings');
-    await page.locator('button[onclick="openProfileModal()"]').click();
+    await page.locator('button[data-action="openProfileModal"]').click();
     await page.locator('#profileSex').selectOption('F');
     await page.locator('#profileAge').fill('30');
     await page.locator('#profileHeight').fill('165');
@@ -205,7 +212,7 @@ test.describe('Profile & predicted DEP modal', () => {
   test('closing modal via ✕ button hides it', async ({ page }) => {
     await page.goto('/');
     await goToTab(page, 'settings');
-    await page.locator('button[onclick="openProfileModal()"]').click();
+    await page.locator('button[data-action="openProfileModal"]').click();
     await page.locator('#profileModal .modal-close').click();
     await expect(page.locator('#profileModal')).not.toHaveClass(/open/);
   });

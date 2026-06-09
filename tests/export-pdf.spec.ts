@@ -4,7 +4,13 @@ import path from 'path';
 
 test.describe('Export PDF', () => {
 
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    const dbName = `AsthmeTrackDB_worker_${testInfo.workerIndex}`;
+    await page.addInitScript((name) => localStorage.setItem('__TEST_DB_NAME__', name), dbName);
+    await clearIDB(page, dbName);
+    await page.addInitScript(() => localStorage.clear());
+    await page.addInitScript((name) => localStorage.setItem('__TEST_DB_NAME__', name), dbName);
+
     await seedMeasures(page, [
       fakeMeasure({ id: 1, dt: '2025-01-15T08:00', dep: 400, dep1: 390, dep2: 400, dep3: 410, spo2: 97, easy: 1, comment: 'Test matin' }),
       fakeMeasure({ id: 2, dt: '2025-01-16T08:00', dep: 380, dep1: 375, dep2: 380, dep3: 385, spo2: 96, easy: 2, comment: '' }),
@@ -32,14 +38,14 @@ test.describe('Export PDF', () => {
 
     const [download] = await Promise.all([
       page.waitForEvent('download'),
-      page.locator('button[onclick="exportPDF()"]').last().click(),
+      page.locator('button[data-action="exportPDF"]').last().click(),
     ]);
 
     expect(download.suggestedFilename()).toContain('.pdf');
   });
 
   test('export PDF sur données vides affiche un toast d\'erreur', async ({ page }) => {
-    // Vide l'IndexedDB avant navigation
+    // Override beforeEach seeding by clearing again
     await clearIDB(page);
     await page.goto('/');
     await goToTab(page, 'historique');

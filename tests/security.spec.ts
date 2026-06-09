@@ -430,11 +430,18 @@ test.describe('CSP does not include api.anthropic.com (fix 4)', () => {
     expect(csp).not.toContain('api.anthropic.com');
   });
 
-  test('CSP still allows googleapis.com and accounts.google.com', async ({ page }) => {
+  test('CSP still allows googleapis.com and accounts.google.com (fix 4)', async ({ page }) => {
     await page.goto('/');
     const csp = await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content');
     expect(csp).toContain('https://www.googleapis.com');
     expect(csp).toContain('https://accounts.google.com');
   });
 
-});
+  test('CSP does not contain unsafe-inline for script-src (#11)', async ({ page }) => {
+    await page.goto('/');
+    const csp = await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content');
+    const scriptSrc = csp?.split(';').find(s => s.trim().startsWith('script-src'));
+    expect(scriptSrc).not.toContain("'unsafe-inline'");
+  });
+
+  });

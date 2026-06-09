@@ -108,10 +108,18 @@ const SecureStore = {
   _prefs() { return IS_CAPACITOR && window.Capacitor?.Plugins?.Preferences || null; },
   async _getDB() {
     if (this._db) return this._db;
+    const dbName = localStorage.getItem('__TEST_DB_NAME__') || 'AsthmeTrackDB';
     return new Promise((resolve, reject) => {
-      const req = indexedDB.open('AsthmeTrackDB', 1);
+      const req = indexedDB.open(dbName, 1);
       req.onupgradeneeded = () => req.result.createObjectStore('kv');
-      req.onsuccess = () => { this._db = req.result; resolve(req.result); };
+      req.onsuccess = () => {
+        this._db = req.result;
+        this._db.onversionchange = () => {
+          this._db.close();
+          this._db = null;
+        };
+        resolve(req.result);
+      };
       req.onerror = () => reject(req.error);
     });
   },
@@ -147,6 +155,12 @@ const SecureStore = {
   },
   /** No longer need init() to copy to localStorage as we now use async accessors */
   async init() {},
+  async close() {
+    if (this._db) {
+      this._db.close();
+      this._db = null;
+    }
+  }
 };
 
 // ══════════════════════════════════════════
@@ -1151,7 +1165,7 @@ function _buildHistoryItem(m) {
 function renderHistory(reset=true){
   const measures=DB.measures,cont=document.getElementById('historyList');
   if(!measures.length){
-    cont.innerHTML=`<div class="empty-state"><p>${t('history_empty')}</p><button class="empty-state-cta" onclick="showPage('saisie',document.querySelectorAll('.nav-btn')[1])">${t('btn_save_measure')}</button></div>`;
+    cont.innerHTML=`<div class="empty-state"><p>${t('history_empty')}</p><button class="empty-state-cta" data-action="showSaisie">${t('btn_save_measure')}</button></div>`;
     return;
   }
   if(reset) _historyShown=HISTORY_PAGE_SIZE;
@@ -1671,13 +1685,13 @@ function renderSettings(){
           </div>
         </div>
         <div class="drive-btns">
-          <button class="drive-btn upload" onclick="driveSyncUp()">${t('btn_drive_upload')}</button>
-          <button class="drive-btn download" onclick="driveSyncDown()">${t('btn_drive_download')}</button>
-          <button class="drive-btn danger" onclick="disconnectDrive()">${t('btn_drive_disconnect')}</button>
+          <button class="drive-btn upload" data-action="driveSyncUp">${t('btn_drive_upload')}</button>
+          <button class="drive-btn download" data-action="driveSyncDown">${t('btn_drive_download')}</button>
+          <button class="drive-btn danger" data-action="disconnectDrive">${t('btn_drive_disconnect')}</button>
         </div>
       `:`
         <p style="font-size:14px;color:var(--muted);margin-bottom:16px">${t('settings_drive_desc')}</p>
-        <button class="btn-google" onclick="connectDrive()">
+        <button class="btn-google" data-action="connectDrive">
           <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
             <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
@@ -1693,10 +1707,10 @@ function renderSettings(){
       <div class="card-title">${t('settings_dep_title')}</div>
       <div class="setting-row">
         <div><div class="setting-label">${t('settings_profile_label')}</div><div class="setting-sub">${t('settings_profile_sub')}</div></div>
-        <button class="btn-secondary" onclick="openProfileModal()">${t('btn_profile_open')}</button>
+        <button class="btn-secondary" data-action="openProfileModal">${t('btn_profile_open')}</button>
       </div>
       <div class="field" style="margin-top:12px"><label>${t('settings_dep_label')}</label><input type="number" id="bestDEPInput" value="${esc(DB.bestDEP)}" min="100" max="900"/></div>
-      <button class="btn-primary" onclick="saveBestDEP()">${t('btn_save_dep')}</button>
+      <button class="btn-primary" data-action="saveBestDEP">${t('btn_save_dep')}</button>
     </div>
 
     <div class="card">
@@ -1705,7 +1719,7 @@ function renderSettings(){
       <div class="add-reminder-form">
         <input type="time" id="reminderTime"/>
         <input type="text" id="reminderLabel" placeholder="${t('reminder_ph_label')}"/>
-        <button class="btn-secondary" onclick="addReminder()">${t('btn_add_reminder')}</button>
+        <button class="btn-secondary" data-action="addReminder">${t('btn_add_reminder')}</button>
       </div>
     </div>
 
@@ -1713,31 +1727,31 @@ function renderSettings(){
       <div class="card-title">${t('settings_appearance_title')}</div>
       <div class="setting-row">
         <div><div class="setting-label">${t('settings_theme_label')}</div></div>
-        <label class="toggle"><input type="checkbox" id="themeToggle" ${isDark()?'checked':''} onchange="applyTheme(this.checked);renderSettings()"/><span class="toggle-slider"></span></label>
+        <label class="toggle"><input type="checkbox" id="themeToggle" ${isDark()?'checked':''} data-action="toggleTheme"/><span class="toggle-slider"></span></label>
       </div>
       <div class="setting-row">
         <div><div class="setting-label">${t('settings_lang_label')}</div></div>
         <div style="display:flex;gap:6px">
-          <button class="btn-secondary" style="${_lang==='fr'?'border-color:var(--accent);color:var(--accent)':''}" onclick="setLang('fr')">FR</button>
-          <button class="btn-secondary" style="${_lang==='en'?'border-color:var(--accent);color:var(--accent)':''}" onclick="setLang('en')">EN</button>
+          <button class="btn-secondary" style="${_lang==='fr'?'border-color:var(--accent);color:var(--accent)':''}" data-action="setLang" data-val="fr">FR</button>
+          <button class="btn-secondary" style="${_lang==='en'?'border-color:var(--accent);color:var(--accent)':''}" data-action="setLang" data-val="en">EN</button>
         </div>
       </div>
       <div class="setting-row">
         <div><div class="setting-label">${t('settings_font_label')}</div></div>
         <div style="display:flex;gap:6px">
-          <button class="btn-secondary" style="${!isCustomFont()?'border-color:var(--accent);color:var(--accent)':''}" onclick="applyFont(false);renderSettings()">${t('settings_font_system')}</button>
-          <button class="btn-secondary" style="font-family:'DM Mono',monospace;${isCustomFont()?'border-color:var(--accent);color:var(--accent)':''}" onclick="applyFont(true);renderSettings()">${t('settings_font_custom')}</button>
+          <button class="btn-secondary" style="${!isCustomFont()?'border-color:var(--accent);color:var(--accent)':''}" data-action="applyFont" data-val="false">${t('settings_font_system')}</button>
+          <button class="btn-secondary" style="font-family:'DM Mono',monospace;${isCustomFont()?'border-color:var(--accent);color:var(--accent)':''}" data-action="applyFont" data-val="true">${t('settings_font_custom')}</button>
         </div>
       </div>
     </div>
 
     <div class="card">
       <div class="card-title">${t('settings_data_title')}</div>
-      <div class="setting-row"><div><div class="setting-label">${t('settings_export_pdf_label')}</div><div class="setting-sub">${t('settings_export_pdf_sub')}</div></div><button class="btn-secondary" onclick="exportPDF()">${t('btn_export_pdf')}</button></div>
-      <div class="setting-row"><div><div class="setting-label">${t('settings_export_json_label')}</div><div class="setting-sub">${t('settings_export_json_sub')}</div></div><button class="btn-secondary" onclick="exportJSON()">${t('btn_export_json')}</button></div>
-      <div class="setting-row"><div><div class="setting-label">${t('settings_import_json_label')}</div><div class="setting-sub">${t('settings_import_json_sub')}</div></div><button class="btn-secondary" onclick="importJSON()">${t('btn_import_json')}</button></div>
-      <div class="setting-row"><div><div class="setting-label">${t('settings_export_csv_label')}</div><div class="setting-sub">${t('settings_export_csv_sub')}</div></div><button class="btn-secondary" onclick="exportCSV()">${t('btn_export_csv')}</button></div>
-      <div class="setting-row"><div><div class="setting-label">${t('settings_clear_label')}</div><div class="setting-sub">${t('settings_clear_sub')}</div></div><button class="btn-secondary" style="color:var(--red);border-color:var(--red)" onclick="clearAll()">${t('btn_clear')}</button></div>
+      <div class="setting-row"><div><div class="setting-label">${t('settings_export_pdf_label')}</div><div class="setting-sub">${t('settings_export_pdf_sub')}</div></div><button class="btn-secondary" data-action="exportPDF">${t('btn_export_pdf')}</button></div>
+      <div class="setting-row"><div><div class="setting-label">${t('settings_export_json_label')}</div><div class="setting-sub">${t('settings_export_json_sub')}</div></div><button class="btn-secondary" data-action="exportJSON">${t('btn_export_json')}</button></div>
+      <div class="setting-row"><div><div class="setting-label">${t('settings_import_json_label')}</div><div class="setting-sub">${t('settings_import_json_sub')}</div></div><button class="btn-secondary" data-action="importJSON">${t('btn_import_json')}</button></div>
+      <div class="setting-row"><div><div class="setting-label">${t('settings_export_csv_label')}</div><div class="setting-sub">${t('settings_export_csv_sub')}</div></div><button class="btn-secondary" data-action="exportCSV">${t('btn_export_csv')}</button></div>
+      <div class="setting-row"><div><div class="setting-label">${t('settings_clear_label')}</div><div class="setting-sub">${t('settings_clear_sub')}</div></div><button class="btn-secondary" style="color:var(--red);border-color:var(--red)" data-action="clearAll">${t('btn_clear')}</button></div>
     </div>
 
     <div class="card">
@@ -1869,6 +1883,41 @@ window.calcTrend    = calcTrend;
 window.isCrisis     = isCrisis;
 window.depZone      = depZone;
 window.spo2Zone     = spo2Zone;
+// Global Action Delegator (for dynamically rendered buttons)
+document.addEventListener('click', (e) => {
+  const target = e.target.closest('[data-action]');
+  if (!target) return;
+  const action = target.getAttribute('data-action');
+  const val = target.getAttribute('data-val');
+
+  if (action === 'driveSyncUp') driveSyncUp();
+  if (action === 'driveSyncDown') driveSyncDown();
+  if (action === 'disconnectDrive') disconnectDrive();
+  if (action === 'connectDrive') connectDrive();
+  if (action === 'openProfileModal') openProfileModal();
+  if (action === 'saveBestDEP') saveBestDEP();
+  if (action === 'addReminder') addReminder();
+  if (action === 'setLang') setLang(val);
+  if (action === 'applyFont') { applyFont(val === 'true'); renderSettings(); }
+  if (action === 'exportPDF') exportPDF();
+  if (action === 'exportJSON') exportJSON();
+  if (action === 'importJSON') importJSON();
+  if (action === 'exportCSV') exportCSV();
+  if (action === 'clearAll') clearAll();
+  if (action === 'showSaisie') showPage('saisie', document.querySelectorAll('.nav-btn')[1]);
+  if (action === 'showPage') showPage(val, target);
+  if (action === 'saveMeasure') saveMeasure();
+  if (action === 'saveEdit') saveEdit();
+  if (action === 'closeEditModal') closeEditModal();
+  if (action === 'closeProfileModal') closeProfileModal();
+  if (action === 'selectEasy') selectEasy(parseInt(val));
+  if (action === 'selectEditEasy') selectEditEasy(parseInt(val));
+  if (action === 'toggleTheme') {
+      const dark = target.checked;
+      applyTheme(dark);
+      renderSettings();
+  }
+});
 
 document.addEventListener('DOMContentLoaded', async ()=>{
   await DB.load();
@@ -1877,6 +1926,28 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   applyFont(isCustomFont()); // re-apply after DOM ready (link element now accessible)
   document.documentElement.lang = _lang;
   renderStaticHTML();
+
+  // ── INITIALIZATION ──
+  // Profile Modal
+  const profileSex = document.getElementById('profileSex');
+  const profileAge = document.getElementById('profileAge');
+  const profileHeight = document.getElementById('profileHeight');
+  if (profileSex) profileSex.addEventListener('change', calcPredictedDEP);
+  if (profileAge) profileAge.addEventListener('input', calcPredictedDEP);
+  if (profileHeight) profileHeight.addEventListener('input', calcPredictedDEP);
+
+  // Saisie Page
+  const depInputs = ['dep1', 'dep2', 'dep3'].map(id => document.getElementById(id));
+  depInputs.forEach(el => { if (el) el.addEventListener('input', updateDepAvg); });
+  const spo2Input = document.getElementById('inputSpO2');
+  if (spo2Input) spo2Input.addEventListener('input', () => updateSpo2Display(spo2Input));
+
+  // Edit Modal
+  const editDepInputs = ['editDep1', 'editDep2', 'editDep3'].map(id => document.getElementById(id));
+  editDepInputs.forEach(el => { if (el) el.addEventListener('input', updateEditDepAvg); });
+  const editSpo2Input = document.getElementById('editSpO2');
+  if (editSpo2Input) editSpo2Input.addEventListener('input', () => updateSpo2Display(editSpo2Input));
+
   // Offline detection
   updateOfflineBanner();
   window.addEventListener('online',  updateOfflineBanner);
@@ -1894,4 +1965,4 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   scheduleReminders(); // Les rappels utilisent le plugin natif
   const el=document.getElementById('inputDatetime');
   if(el){const now=new Date();now.setSeconds(0,0);el.value=now.toISOString().slice(0,16);}
-});
+  });
