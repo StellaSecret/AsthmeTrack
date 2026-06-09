@@ -35,11 +35,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
+        uses: github/codeql-action/init@v3
         with:
           languages: javascript
       - name: Perform Analysis
-        uses: github/codeql-action/analyze@v4
+        uses: github/codeql-action/analyze@v3
 
   npm-security:
     name: NPM Audit & Placeholders
@@ -60,27 +60,28 @@ jobs:
             echo "❌ Google Client ID en clair !" && exit 1
           fi
 
-  # ── PARALLEL TEST JOB ────────────────────────────────
+  # ── PARALLEL TEST JOB (Sharded) ──────────────────────
   playwright-tests:
-    name: Playwright Tests
+    name: Playwright Tests (Shard ${{ matrix.shardIndex }}/${{ matrix.shardTotal }})
+    strategy:
+      fail-fast: false
+      matrix:
+        shardIndex: [1, 2]
+        shardTotal: [2]
     runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.60.0-noble
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
       - name: Run tests
-        run: npm test
+        run: npx playwright test --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }}
       - name: Upload report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.shardIndex }}
           path: playwright-report/
           retention-days: 30
 
@@ -98,7 +99,7 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v6
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: ./www
       - name: Deploy
@@ -144,7 +145,7 @@ jobs:
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: artifacts-${{ github.run_number }}
           path: |
