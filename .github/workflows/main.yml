@@ -7,11 +7,14 @@ on:
     branches: [main]
   workflow_dispatch:
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+permissions:
+  contents: write
+  security-events: write
+  actions: read
+  pages: write
 
 jobs:
-  # ── SÉCURITÉ 1 : SCAN DE SECRETS ───────────────────────
+  # ── PARALLEL SECURITY JOBS ────────────────────────────
   scan-secrets:
     name: Secret Scan
     runs-on: ubuntu-latest
@@ -23,18 +26,11 @@ jobs:
         uses: trufflesecurity/trufflehog@main
         with:
           path: ./
-          base: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
-          head: ${{ github.sha }}
-          extra_args: --debug --only-verified
+          extra_args: --only-verified
 
-  # ── SÉCURITÉ 2 : ANALYSE STATIQUE ──────────────────────
   codeql-analysis:
-    name: CodeQL
+    name: CodeQL Analysis
     runs-on: ubuntu-latest
-    permissions:
-      security-events: write
-      actions: read
-      contents: read
     steps:
       - uses: actions/checkout@v4
       - name: Initialize CodeQL
@@ -44,7 +40,6 @@ jobs:
       - name: Perform Analysis
         uses: github/codeql-action/analyze@v3
 
-  # ── SÉCURITÉ 3 : AUDIT DÉPENDANCES ─────────────────────
   npm-security:
     name: NPM Audit & Placeholders
     runs-on: ubuntu-latest
@@ -54,21 +49,20 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - name: Install
-        run: npm ci
-      - name: Audit
-        run: npm audit --audit-level=high
+      - name: Install & Audit
+        run: |
+          npm ci
+          npm audit --audit-level=high
       - name: Verify Placeholders
         run: |
           if grep -q "apps.googleusercontent.com" www/index.html || grep -q "apps.googleusercontent.com" capacitor.config.json; then
             echo "❌ Google Client ID en clair !" && exit 1
           fi
 
-  # ── TESTS NON-RÉGRESSION (Playwright) ──────────────────
-  playwright:
+  # ── PARALLEL TEST JOB ────────────────────────────────
+  playwright-tests:
     name: Playwright Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -89,14 +83,33 @@ jobs:
           path: playwright-report/
           retention-days: 30
 
-  # ── BUILD ANDROID (Attend sécurité + tests) ─────────────
-  build:
+  # ── SEQUENTIAL DEPLOYMENT JOBS ───────────────────────
+  deploy-pages:
+    name: Deploy to GitHub Pages
+    needs: [playwright-tests]
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./www
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v5
+
+  build-android:
     name: Build Android
-    needs: [scan-secrets, codeql-analysis, npm-security, playwright]
-    if: github.event_name != 'pull_request'
+    if: github.ref == 'refs/heads/main'
+    needs: [scan-secrets, codeql-analysis, npm-security, playwright-tests]
     runs-on: ubuntu-latest
     outputs:
-      artifact-name: ${{ steps.artifact-name.outputs.name }}
+      artifact-name: artifacts-${{ github.run_number }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -115,12 +128,6 @@ jobs:
           npx cap sync android
       - name: Decode keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/asthmetrack-release.jks
-      - name: Set versionCode
-        run: |
-          VCODE=$((28 + ${{ github.run_number }}))
-          sed -i "s/versionCode .*/versionCode $VCODE/" android/app/build.gradle
-          echo "versionCode → ${{ github.run_number }}"
-          grep versionCode android/app/build.gradle
       - name: Build Bundle & APK
         run: |
           cd android
@@ -129,35 +136,30 @@ jobs:
           sed -i "s/versionCode .*/versionCode $VCODE/" app/build.gradle
           ./gradlew bundleRelease assembleRelease \
             -Pandroid.injected.signing.store.file=$GITHUB_WORKSPACE/android/app/asthmetrack-release.jks \
-            -Pandroid.injected.signing.store.password=${{ secrets.KEYSTORE_PASSWORD }} \
-            -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
-            -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }} --no-daemon
+            -Pandroid.injected.signing.store.password="${{ secrets.KEYSTORE_PASSWORD }}" \
+            -Pandroid.injected.signing.key.alias="${{ secrets.KEY_ALIAS }}" \
+            -Pandroid.injected.signing.key.password="${{ secrets.KEY_PASSWORD }}" --no-daemon
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-      - name: Set artifact name
-        id: artifact-name
-        run: echo "name=artifacts-${{ github.run_id }}" >> $GITHUB_OUTPUT
-      - name: Upload
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: artifacts-${{ github.run_id }}
+          name: artifacts-${{ github.run_number }}
           path: |
             android/app/build/outputs/bundle/release/app-release.aab
             android/app/build/outputs/apk/release/app-release.apk
-          retention-days: 1
+          retention-days: 7
 
-  # ── RELEASE ─────────────────────────────────────────────
   release:
     name: Create Release
-    needs: build
+    if: github.ref == 'refs/heads/main'
+    needs: build-android
     runs-on: ubuntu-latest
     environment: release
-    permissions:
-      contents: write
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: ${{ needs.build.outputs.artifact-name }}
+          name: artifacts-${{ github.run_number }}
           path: dist/
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
