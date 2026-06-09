@@ -1360,6 +1360,32 @@ let _driveLoginListener = null;
 async function connectDrive() {
   setSync(true);
   try {
+    if (!IS_CAPACITOR) {
+      // ── WEB FALLBACK (Google Identity Services) ────────────────────────
+      if (!window.google) throw new Error('Google SDK non chargé (vérifiez votre connexion ou bloqueur de pub)');
+      const client = google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE_CLIENT_ID,
+        scope: 'profile email https://www.googleapis.com/auth/drive.appdata',
+        callback: async (resp) => {
+          if (resp.error) {
+            console.error('GSI Error:', resp.error);
+            showToast('Drive: ' + resp.error, 'error');
+            setSync(false);
+            return;
+          }
+          await DB.setDriveToken(resp.access_token);
+          await DB.setDriveTokenExpiry(Date.now() + resp.expires_in * 1000);
+          await fetchDriveUserInfo(resp.access_token);
+          renderSettings();
+          showToast(t('drive_connected_toast'));
+          await _driveCheckAndPrompt();
+          setSync(false);
+        }
+      });
+      client.requestAccessToken();
+      return;
+    }
+
     const SocialLogin = getSocialLogin();
     if (!SocialLogin) {
       showToast(t('drive_plugin_unavailable'),'error');
@@ -1390,13 +1416,36 @@ async function connectDrive() {
     console.error('Google Auth error:', e);
     showToast('Drive: ' + (e.message||JSON.stringify(e)).slice(0,80), 'error');
   } finally {
-    if (!IS_CAPACITOR) setSync(false);
+    if (IS_CAPACITOR) setSync(false);
   }
 }
 
 async function ensureValidToken() {
-  if (!(await DB.getDriveToken())) return false;
-  if (Date.now() < (await DB.getDriveTokenExpiry()) - 60000) return true;
+  const token = await DB.getDriveToken();
+  if (!token) return false;
+  const expiry = await DB.getDriveTokenExpiry();
+  if (Date.now() < expiry - 60000) return true;
+
+  if (!IS_CAPACITOR) {
+    // Sur Web, on demande un nouveau token (potentiellement silencieux si déjà autorisé)
+    return new Promise((resolve) => {
+      try {
+        const client = google.accounts.oauth2.initTokenClient({
+          client_id: GOOGLE_CLIENT_ID,
+          scope: 'profile email https://www.googleapis.com/auth/drive.appdata',
+          prompt: '', // Laisse Google décider si une interaction est requise
+          callback: async (resp) => {
+            if (resp.error) { resolve(false); return; }
+            await DB.setDriveToken(resp.access_token);
+            await DB.setDriveTokenExpiry(Date.now() + resp.expires_in * 1000);
+            resolve(true);
+          }
+        });
+        client.requestAccessToken();
+      } catch(e) { resolve(false); }
+    });
+  }
+
   try {
     const SocialLogin = getSocialLogin();
     if (!SocialLogin) { await DB.setDriveToken(null); return false; }
@@ -1408,9 +1457,9 @@ async function ensureValidToken() {
         filterByAuthorizedAccounts: true,
       }
     });
-    const token = extractDriveToken(result);
-    if (token) {
-      await DB.setDriveToken(token);
+    const newToken = extractDriveToken(result);
+    if (newToken) {
+      await DB.setDriveToken(newToken);
       await DB.setDriveTokenExpiry(Date.now() + 3500 * 1000);
       return true;
     }

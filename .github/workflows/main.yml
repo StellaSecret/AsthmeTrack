@@ -98,6 +98,11 @@ jobs:
       - uses: actions/checkout@v6
       - name: Setup Pages
         uses: actions/configure-pages@v6
+      - name: Inject Client ID
+        run: |
+          sed -i "s|__GOOGLE_CLIENT_ID__|${{ secrets.GOOGLE_CLIENT_ID }}|g" www/index.html
+          sed -i "s|__GOOGLE_CLIENT_ID__|${{ secrets.GOOGLE_CLIENT_ID }}|g" www/app.js
+          sed -i "s|__GOOGLE_CLIENT_ID__|${{ secrets.GOOGLE_CLIENT_ID }}|g" capacitor.config.json
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v5
         with:
@@ -127,6 +132,7 @@ jobs:
         run: |
           npm ci
           sed -i "s|__GOOGLE_CLIENT_ID__|${{ secrets.GOOGLE_CLIENT_ID }}|g" www/index.html
+          sed -i "s|__GOOGLE_CLIENT_ID__|${{ secrets.GOOGLE_CLIENT_ID }}|g" www/app.js
           sed -i "s|__GOOGLE_CLIENT_ID__|${{ secrets.GOOGLE_CLIENT_ID }}|g" capacitor.config.json
           npx cap sync android
       - name: Decode keystore
