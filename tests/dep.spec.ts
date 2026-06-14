@@ -5,7 +5,7 @@ test.describe('DEP — calcul de la moyenne', () => {
 
   test.beforeEach(async ({ page }) => {
     await seedBestDEP(page, 450);
-    await page.goto('/');
+    await page.goto('/app.html');
     await goToTab(page, 'saisie');
   });
 

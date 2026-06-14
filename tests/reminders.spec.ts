@@ -32,7 +32,7 @@ test.describe('Rappels — scheduling & notifications', () => {
       });
     });
 
-    await page.goto('/');
+    await page.goto('/app.html');
     await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(100);
 
@@ -41,7 +41,7 @@ test.describe('Rappels — scheduling & notifications', () => {
   });
 
   test('ajouter un rappel l\'affiche dans la liste', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app.html');
     await goToTab(page, 'settings');
     await page.locator('#reminderTime').fill('08:30');
     await page.locator('#reminderLabel').fill('Matin');
@@ -51,7 +51,7 @@ test.describe('Rappels — scheduling & notifications', () => {
   });
 
   test('un rappel ajouté est persisté dans localStorage', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app.html');
     await goToTab(page, 'settings');
     await page.locator('#reminderTime').fill('20:00');
     await page.locator('#reminderLabel').fill('Soir');
@@ -66,7 +66,7 @@ test.describe('Rappels — scheduling & notifications', () => {
 
   test('désactiver un rappel le marque inactive', async ({ page }) => {
     await seedReminders(page, [{ time: '08:00', label: 'Matin', active: true }]);
-    await page.goto('/');
+    await page.goto('/app.html');
     await goToTab(page, 'settings');
 
     // Le checkbox est dans un <label class="toggle"> avec display CSS qui cache l'input natif.
@@ -85,7 +85,7 @@ test.describe('Rappels — scheduling & notifications', () => {
       { time: '08:00', label: 'Matin', active: true },
       { time: '20:00', label: 'Soir', active: true },
     ]);
-    await page.goto('/');
+    await page.goto('/app.html');
     await goToTab(page, 'settings');
 
     await expect(page.locator('.reminder-item')).toHaveCount(2);
@@ -97,7 +97,7 @@ test.describe('Rappels — scheduling & notifications', () => {
   });
 
   test('ajouter un rappel sans heure affiche une erreur', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app.html');
     await goToTab(page, 'settings');
     await page.locator('#reminderLabel').fill('Sans heure');
     await page.locator('button[data-action="addReminder"]').click();
@@ -115,7 +115,7 @@ test.describe('Rappels — scheduling & notifications', () => {
         return orig(fn, delay, ...args);
       };
     });
-    await page.goto('/');
+    await page.goto('/app.html');
     const count = await page.evaluate(() => (window as any).__setTimeoutCallCount);
     expect(count).toBeGreaterThanOrEqual(1);
   });
