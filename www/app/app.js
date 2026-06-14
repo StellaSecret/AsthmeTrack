@@ -1098,7 +1098,9 @@ function drawLineChart(id,labels,data,color,yMin,yMax){
   ctx.clearRect(0,0,W,H);if(!data.length)return;
   const _gridCol=getComputedStyle(document.documentElement).getPropertyValue('--border').trim()||'rgba(200,210,220,0.3)';
   ctx.strokeStyle=_gridCol+'88';ctx.lineWidth=1;
-  [0.25,0.5,0.75,1].forEach(t=>{const y=pad.top+h*(1-t);ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(pad.left+w,y);ctx.stroke();ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--muted').trim()||'#6b7280';ctx.font='9px ' + getComputedStyle(document.documentElement).getPropertyValue('--font-mono').trim();ctx.fillText(Math.round(yMin+range*t),0,y+3);});
+  [0.25,0.5,0.75].forEach(t=>{const y=pad.top+h*(1-t);ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(pad.left+w,y);ctx.stroke();ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--muted').trim()||'#6b7280';ctx.font='9px ' + getComputedStyle(document.documentElement).getPropertyValue('--font-mono').trim();ctx.fillText(Math.round(yMin+range*t),0,y+3);});
+  // Also draw the top label without the grid line
+  const t=1; const y=pad.top+h*(1-t); ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--muted').trim()||'#6b7280';ctx.font='9px ' + getComputedStyle(document.documentElement).getPropertyValue('--font-mono').trim();ctx.fillText(Math.round(yMin+range*t),0,y+3);
   const grad=ctx.createLinearGradient(0,pad.top,0,pad.top+h);grad.addColorStop(0,color+'40');grad.addColorStop(1,'transparent');
   if(data.length>1){ctx.beginPath();ctx.moveTo(toX(0),toY(data[0]));data.forEach((v,i)=>{if(i>0)ctx.lineTo(toX(i),toY(v));});ctx.lineTo(toX(data.length-1),pad.top+h);ctx.lineTo(toX(0),pad.top+h);ctx.closePath();ctx.fillStyle=grad;ctx.fill();}
   ctx.beginPath();ctx.strokeStyle=color;ctx.lineWidth=2;ctx.lineJoin='round';
@@ -1108,6 +1110,7 @@ function drawLineChart(id,labels,data,color,yMin,yMax){
   const step=Math.max(1,Math.floor(labels.length/5));
   labels.forEach((l,i)=>{if(i%step===0||i===labels.length-1)ctx.fillText(l,toX(i),H-6);});
 }
+
 
 // ══════════════════════════════════════════
 //  HISTORY
@@ -1222,9 +1225,9 @@ async function _doExportPDF(measures){
       d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}),
       m.dep+' L/m',
       souffles||'-',
-      zoneLabel(dz),
+      zoneLabel(dz).replace(/🟢|🟡|🔴/g,'').trim(),
       (m.spo2||'-')+'%',
-      m.spo2?zoneLabel(spo2Zone(m.spo2)):'-',
+      m.spo2?zoneLabel(spo2Zone(m.spo2)).replace(/🟢|🟡|🔴/g,'').trim():'-',
       m.easy!=null?m.easy+' '+t('prise_short'):'-',
       (m.comment||'').slice(0,30)
     ];
@@ -1254,26 +1257,42 @@ async function _doExportPDF(measures){
     doc.text(t('pdf_charts_title'),10,9);
 
     let gy = 22;
-    const chartW = 190, chartH = 55;
+    // Adjusted chart dimensions to maintain 600x240 aspect ratio (2.5)
+    const chartW = 190, chartH = 76;
+
+    // Helper to capture high-res canvas
+    const getHighResImg = (canvas) => {
+        // Use the actual canvas internal resolution
+        const ratio = 3;
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = canvas.width * ratio;
+        tempCanvas.height = canvas.height * ratio;
+        const ctx = tempCanvas.getContext('2d');
+        ctx.scale(ratio, ratio);
+        ctx.drawImage(canvas, 0, 0);
+        return tempCanvas.toDataURL('image/png', 1.0);
+    };
 
     if (canvasDep && canvasDep.width > 0) {
       try {
-        const imgDep = canvasDep.toDataURL('image/png');
+        const imgDep = getHighResImg(canvasDep);
         doc.setFillColor(30,34,45); doc.rect(8,gy-5,194,chartH+12,'F');
         doc.setTextColor(...blue); doc.setFontSize(8); doc.setFont('helvetica','bold');
         doc.text(t('pdf_dep_label'),10,gy);
-        doc.addImage(imgDep,'PNG',10,gy+3,chartW,chartH);
+        doc.addImage(imgDep,'PNG',10,gy+2,chartW,chartH);
         gy += chartH + 18;
       } catch(e) { console.warn('PDF chart DEP error:', e); }
     }
 
     if (canvasSpo && canvasSpo.width > 0) {
       try {
-        const imgSpo = canvasSpo.toDataURL('image/png');
+        const imgSpo = getHighResImg(canvasSpo);
         doc.setFillColor(30,34,45); doc.rect(8,gy-5,194,chartH+12,'F');
         doc.setTextColor(16,217,160); doc.setFontSize(8); doc.setFont('helvetica','bold');
         doc.text(t('pdf_spo2_label'),10,gy);
-        doc.addImage(imgSpo,'PNG',10,gy+3,chartW,chartH);
+        doc.addImage(imgSpo,'PNG',10,gy+2,chartW,chartH);
+        gy += chartH + 18;
+
       } catch(e) { console.warn('PDF chart SpO2 error:', e); }
     }
 
