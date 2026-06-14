@@ -8,7 +8,7 @@ import { Page } from '@playwright/test';
 async function ensureOrigin(page: Page) {
   const url = page.url();
   if (url === 'about:blank' || !url.includes('localhost:3333')) {
-    await page.goto('/');
+    await page.goto('/app/app.html');
   }
 }
 

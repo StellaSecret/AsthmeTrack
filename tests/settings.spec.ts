@@ -19,7 +19,7 @@ test.beforeEach(async ({ page }, testInfo) => {
 test.describe('Calibration DEP', () => {
 
   test('saving a valid bestDEP persists it and shows a toast', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/app.html');
     await goToTab(page, 'settings');
     await page.locator('#bestDEPInput').fill('520');
     await page.locator('button[data-action="saveBestDEP"]').click();
@@ -30,7 +30,7 @@ test.describe('Calibration DEP', () => {
   });
 
   test('saving an out-of-range bestDEP shows an error toast', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/app.html');
     await goToTab(page, 'settings');
     await page.locator('#bestDEPInput').fill('50'); // below min 100
     await page.locator('button[data-action="saveBestDEP"]').click();
@@ -46,7 +46,7 @@ test.describe('Clear all data', () => {
 
   test('clearAll removes all measures after confirmation', async ({ page }) => {
     await seedMeasures(page, [fakeMeasure(), fakeMeasure({ id: 2, dt: '2025-02-01T08:00' })]);
-    await page.goto('/');
+    await page.goto('/app/app.html');
     await goToTab(page, 'settings');
     page.on('dialog', d => d.accept());
     await page.locator('button[data-action="clearAll"]').click();
@@ -56,7 +56,7 @@ test.describe('Clear all data', () => {
 
   test('clearAll cancelled leaves data intact', async ({ page }) => {
     await seedMeasures(page, [fakeMeasure()]);
-    await page.goto('/');
+    await page.goto('/app/app.html');
     await goToTab(page, 'settings');
     page.on('dialog', d => d.dismiss());
     await page.locator('button[data-action="clearAll"]').click();
@@ -70,7 +70,7 @@ test.describe('JSON export / import', () => {
 
   test('export JSON triggers a download with correct filename', async ({ page }) => {
     await seedMeasures(page, [fakeMeasure()]);
-    await page.goto('/');
+    await page.goto('/app/app.html');
     await goToTab(page, 'settings');
     const [download] = await Promise.all([
       page.waitForEvent('download'),
@@ -80,7 +80,7 @@ test.describe('JSON export / import', () => {
   });
 
   test('imported JSON replaces measures and shows toast', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/app.html');
     await goToTab(page, 'settings');
 
     // Build a valid backup object
@@ -126,7 +126,7 @@ test.describe('CSV export', () => {
   test('export CSV triggers a download with correct filename', async ({ page }) => {
     await seedMeasures(page, [fakeMeasure({ comment: 'test, with "quotes"' })]);
     await seedBestDEP(page, 450);
-    await page.goto('/');
+    await page.goto('/app/app.html');
     await goToTab(page, 'settings');
     const [download] = await Promise.all([
       page.waitForEvent('download'),
@@ -136,7 +136,7 @@ test.describe('CSV export', () => {
   });
 
   test('export CSV on empty data shows error toast', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/app.html');
     await goToTab(page, 'settings');
     await page.locator('button[data-action="exportCSV"]').click();
     const toast = await waitForToast(page);
@@ -148,7 +148,7 @@ test.describe('CSV export', () => {
 test.describe('Appearance — theme and language', () => {
 
   test('toggling dark/light theme persists to localStorage', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/app.html');
     await goToTab(page, 'settings');
     const before = await page.evaluate(() => localStorage.getItem('at_theme'));
     // The input is invisible, click the slider label
@@ -158,7 +158,7 @@ test.describe('Appearance — theme and language', () => {
   });
 
   test('switching to English updates nav labels', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/app.html');
     await goToTab(page, 'settings');
     await page.locator('button[data-action="setLang"][data-val="en"]').click();
     // Nav label for history tab should now be 'History'
@@ -167,7 +167,7 @@ test.describe('Appearance — theme and language', () => {
 
   test('switching back to French restores nav labels', async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem('at_lang', 'en'));
-    await page.goto('/');
+    await page.goto('/app/app.html');
     await goToTab(page, 'settings');
     await page.locator('button[data-action="setLang"][data-val="fr"]').click();
     await expect(page.locator('nav .nav-btn').nth(2)).toContainText('Historique');
@@ -178,14 +178,14 @@ test.describe('Appearance — theme and language', () => {
 test.describe('Profile & predicted DEP modal', () => {
 
   test('opening the profile modal shows it', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/app.html');
     await goToTab(page, 'settings');
     await page.locator('button[data-action="openProfileModal"]').click();
     await expect(page.locator('#profileModal')).toHaveClass(/open/);
   });
 
   test('valid profile inputs compute a predicted DEP', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/app.html');
     await goToTab(page, 'settings');
     await page.locator('button[data-action="openProfileModal"]').click();
     await page.locator('#profileSex').selectOption('M');
@@ -197,7 +197,7 @@ test.describe('Profile & predicted DEP modal', () => {
   });
 
   test('"Use as best DEP" updates bestDEP and closes modal', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/app.html');
     await goToTab(page, 'settings');
     await page.locator('button[data-action="openProfileModal"]').click();
     await page.locator('#profileSex').selectOption('F');
@@ -210,7 +210,7 @@ test.describe('Profile & predicted DEP modal', () => {
   });
 
   test('closing modal via ✕ button hides it', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/app.html');
     await goToTab(page, 'settings');
     await page.locator('button[data-action="openProfileModal"]').click();
     await page.locator('#profileModal .modal-close').click();
