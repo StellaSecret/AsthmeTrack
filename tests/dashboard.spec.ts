@@ -16,7 +16,7 @@ test.describe('Crisis banner', () => {
       fakeMeasure({ id: 2, dt: '2025-01-14T08:00', dep: 210 }),
     ]);
     await seedBestDEP(page, 450);
-    await page.goto('/');
+    await page.goto('/app.html');
     await page.waitForSelector('#dashboardContent .crisis-banner');
     await expect(page.locator('.crisis-banner')).toBeVisible();
   });
@@ -27,7 +27,7 @@ test.describe('Crisis banner', () => {
       fakeMeasure({ id: 2, dt: '2025-01-14T08:00', dep: 200 }), // red but not latest
     ]);
     await seedBestDEP(page, 450);
-    await page.goto('/');
+    await page.goto('/app.html');
     await page.waitForSelector('#dashboardContent .card');
     await expect(page.locator('.crisis-banner')).toHaveCount(0);
   });
@@ -37,7 +37,7 @@ test.describe('Crisis banner', () => {
       fakeMeasure({ id: 1, dt: '2025-01-15T08:00', dep: 200 }),
     ]);
     await seedBestDEP(page, 450);
-    await page.goto('/');
+    await page.goto('/app.html');
     await page.waitForSelector('#dashboardContent .card');
     await expect(page.locator('.crisis-banner')).toHaveCount(0);
   });
@@ -50,7 +50,7 @@ test.describe('Zone logic', () => {
     // 70% of 500 = 350
     await seedMeasures(page, [fakeMeasure({ dep: 350 })]);
     await seedBestDEP(page, 500);
-    await page.goto('/');
+    await page.goto('/app.html');
     await page.waitForSelector('#dashboardContent .metric-box');
     await expect(page.locator('.metric-box.yellow').first()).toBeVisible();
   });
@@ -58,7 +58,7 @@ test.describe('Zone logic', () => {
   test('SpO2 green zone: >= 95%', async ({ page }) => {
     await seedMeasures(page, [fakeMeasure({ spo2: 97 })]);
     await seedBestDEP(page, 400);
-    await page.goto('/');
+    await page.goto('/app.html');
     await page.waitForSelector('#dashboardContent .metric-box');
     // Second metric-box is SpO2
     await expect(page.locator('.metric-box').nth(1)).toHaveClass(/green/);
@@ -67,7 +67,7 @@ test.describe('Zone logic', () => {
   test('SpO2 red zone: < 90%', async ({ page }) => {
     await seedMeasures(page, [fakeMeasure({ spo2: 88 })]);
     await seedBestDEP(page, 400);
-    await page.goto('/');
+    await page.goto('/app.html');
     await page.waitForSelector('#dashboardContent .metric-box');
     await expect(page.locator('.metric-box').nth(1)).toHaveClass(/red/);
   });
@@ -75,7 +75,7 @@ test.describe('Zone logic', () => {
   test('SpO2 yellow zone: 90–94%', async ({ page }) => {
     await seedMeasures(page, [fakeMeasure({ spo2: 92 })]);
     await seedBestDEP(page, 400);
-    await page.goto('/');
+    await page.goto('/app.html');
     await page.waitForSelector('#dashboardContent .metric-box');
     await expect(page.locator('.metric-box').nth(1)).toHaveClass(/yellow/);
   });
@@ -90,7 +90,7 @@ test.describe('Charts', () => {
       fakeMeasure({ id: 2, dt: '2025-01-15T08:00', dep: 400 }),
     ]);
     await seedBestDEP(page, 450);
-    await page.goto('/');
+    await page.goto('/app.html');
     await page.waitForSelector('#chartDEP');
     const depW  = await page.locator('#chartDEP').evaluate((c: HTMLCanvasElement) => c.width);
     const spo2W = await page.locator('#chartSPO2').evaluate((c: HTMLCanvasElement) => c.width);
@@ -103,7 +103,7 @@ test.describe('Charts', () => {
 test.describe('Offline banner', () => {
 
   test('offline banner appears when navigator.onLine is false', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app.html');
     await page.evaluate(() => {
       Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
       window.dispatchEvent(new Event('offline'));
@@ -112,7 +112,7 @@ test.describe('Offline banner', () => {
   });
 
   test('offline banner disappears when back online', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app.html');
     await page.evaluate(() => {
       Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
       window.dispatchEvent(new Event('offline'));
@@ -131,7 +131,7 @@ test.describe('Easyhaler dose display on dashboard', () => {
   test('dose count appears in the dashboard card', async ({ page }) => {
     await seedMeasures(page, [fakeMeasure({ easy: 3 })]);
     await seedBestDEP(page, 450);
-    await page.goto('/');
+    await page.goto('/app.html');
     await page.waitForSelector('#dashboardContent .zone-badge');
     await expect(page.locator('#dashboardContent')).toContainText('3');
   });

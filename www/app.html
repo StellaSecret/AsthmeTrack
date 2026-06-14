@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="theme-color" id="metaThemeColor" content="#0d0f14"/>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' capacitor:; script-src 'self' capacitor: https://accounts.google.com; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://www.googleapis.com https://accounts.google.com capacitor:; frame-src https://accounts.google.com; object-src 'none'"/>
+<title>AsthmeTrack</title>
+<!-- Syne: heading font (no system equivalent, ~18 KB) -->
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<!-- DM Mono: loaded only when custom font preference is active (see applyFont) -->
+<link id="dmMonoLink" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet" disabled/>
+<link rel="stylesheet" href="app.css"/>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="jspdf.umd.min.js" defer></script>
+</head>
+<body>
+<div class="offline-banner" id="offlineBanner"></div>
+
+<header class="app-header">
+  <h1>AsthmeTrack</h1>
+  <div class="header-right">
+    <div id="syncIndicator" style="font-size:13px;color:var(--muted);display:none">↕ Drive</div>
+    <div class="status-dot" id="statusDot"></div>
+  </div>
+</header>
+
+<!-- DASHBOARD -->
+<div id="page-dashboard" class="page active"><div id="dashboardContent"></div></div>
+
+<!-- SAISIE -->
+<div id="page-saisie" class="page">
+  <div class="card">
+    <div class="card-title" data-i18n="new_measure">Nouvelle mesure</div>
+    <div class="field">
+      <label data-i18n="label_datetime">Date &amp; heure</label>
+      <input type="datetime-local" id="inputDatetime"/>
+    </div>
+    <div class="field">
+      <label data-i18n="label_dep">DEP — Moyenne sur 3 souffles (L/min)</label>
+      <div class="dep-inputs">
+        <div class="dep-field"><label>Souffle 1</label><input type="number" id="dep1" placeholder="—" min="50" max="900" autocomplete="off" oninput="updateDepAvg()"/><span class="dep-hint" id="depHint1"></span></div>
+        <div class="dep-field"><label>Souffle 2</label><input type="number" id="dep2" placeholder="—" min="50" max="900" autocomplete="off" oninput="updateDepAvg()"/><span class="dep-hint" id="depHint2"></span></div>
+        <div class="dep-field"><label>Souffle 3</label><input type="number" id="dep3" placeholder="—" min="50" max="900" autocomplete="off" oninput="updateDepAvg()"/><span class="dep-hint" id="depHint3"></span></div>
+      </div>
+      <div class="dep-avg-display" id="depAvgDisplay" style="display:none">
+        <span class="dep-avg-label">Moyenne calculée</span>
+        <span class="dep-avg-value" id="depAvgValue">—</span>
+      </div>
+    </div>
+    <div class="field">
+      <label data-i18n="label_spo2">SpO₂ — Oxymétrie de pouls (%)</label>
+      <div class="spo2-wrap"><input type="number" id="inputSpO2" placeholder="ex. 97" min="70" max="100" autocomplete="off" oninput="updateSpo2Display(this)"/><span class="spo2-hint" id="spo2Hint">⚠ Hors limites (70–100)</span></div>
+    </div>
+    <div class="field">
+      <label data-i18n="label_easyhaler">Prises Easyhaler aujourd'hui</label>
+      <div class="easyhaler-btns">
+        <button class="easyh-btn" data-val="0" data-action="selectEasy" data-val="0">0</button>
+        <button class="easyh-btn" data-val="1" data-action="selectEasy" data-val="1">1</button>
+        <button class="easyh-btn" data-val="2" data-action="selectEasy" data-val="2">2</button>
+        <button class="easyh-btn" data-val="3" data-action="selectEasy" data-val="3">3</button>
+        <button class="easyh-btn" data-val="4" data-action="selectEasy" data-val="4">4</button>
+        <button class="easyh-btn" data-val="5" data-action="selectEasy" data-val="5">5</button>
+      </div>
+    </div>
+    <div class="field">
+      <label data-i18n="label_comment">Commentaire (facultatif)</label>
+      <textarea id="inputComment" maxlength="500" placeholder="Symptômes, contexte, météo…"></textarea>
+    </div>
+    <button class="btn-primary" data-i18n="btn_save_measure" data-action="saveMeasure">Enregistrer la mesure</button>
+  </div>
+</div>
+
+<!-- HISTORIQUE -->
+<div id="page-historique" class="page">
+  <div class="section-header">
+    <div class="card-title" style="margin:0" data-i18n="history_title">Historique</div>
+    <button class="icon-btn" data-action="exportPDF" title="Exporter PDF">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+    </button>
+  </div>
+  <div id="historyList"></div>
+</div>
+
+<!-- RÉGLAGES -->
+<div id="page-settings" class="page"><div id="settingsContent"></div></div>
+
+<nav class="nav">
+  <button class="nav-btn active" data-action="showPage" data-val="dashboard">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+    Tableau
+  </button>
+  <button class="nav-btn" data-action="showPage" data-val="saisie">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+    Mesure
+  </button>
+  <button class="nav-btn" data-action="showPage" data-val="historique">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+    Historique
+  </button>
+  <button class="nav-btn" data-action="showPage" data-val="settings">
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+    Réglages
+  </button>
+</nav>
+
+
+<!-- PROFILE MODAL -->
+<div class="modal-overlay" id="profileModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" data-i18n="profile_title">Profil &amp; DEP théorique</div>
+      <button class="modal-close" id="closeProfileBtn" data-action="closeProfileModal">✕</button>
+    </div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:16px" data-i18n="profile_age_sub">Valeurs de référence pour adultes (18–70 ans)</p>
+    <div class="profile-grid">
+      <div class="field">
+        <label data-i18n="profile_sex">Sexe</label>
+        <select id="profileSex" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:var(--font-mono);font-size:16px;padding:12px 14px;outline:none">
+          <option value="M" data-i18n="profile_male">Homme</option>
+          <option value="F" data-i18n="profile_female">Femme</option>
+        </select>
+      </div>
+      <div class="field">
+        <label data-i18n="profile_age">Âge (ans)</label>
+        <input type="number" id="profileAge" min="18" max="70" placeholder="ex. 35" autocomplete="off" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:var(--font-mono);font-size:16px;padding:12px 14px;outline:none"/>
+      </div>
+      <div class="field" style="grid-column:1/-1">
+        <label data-i18n="profile_height">Taille (cm)</label>
+        <input type="number" id="profileHeight" min="100" max="220" placeholder="ex. 170" autocomplete="off" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:var(--font-mono);font-size:16px;padding:12px 14px;outline:none"/>
+      </div>
+    </div>
+    <div class="profile-result" id="profileResult">
+      <div class="profile-result-label" style="color:var(--muted)" data-i18n="profile_no_result">Remplissez le profil pour calculer</div>
+    </div>
+  </div>
+</div>
+<!-- MODAL EDIT -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" data-i18n="edit_title">Modifier la mesure</div>
+      <button class="modal-close" id="closeEditBtn" data-action="closeEditModal">✕</button>
+    </div>
+    <div class="field"><label data-i18n="label_datetime">Date &amp; heure</label><input type="datetime-local" id="editDatetime"/></div>
+    <div class="field">
+      <label data-i18n="label_dep_3">DEP — 3 souffles (L/min)</label>
+      <div class="dep-inputs">
+        <div class="dep-field"><label>Souffle 1</label><input type="number" id="editDep1" placeholder="—" min="50" max="900" autocomplete="off"/><span class="dep-hint" id="editDepHint1"></span></div>
+        <div class="dep-field"><label>Souffle 2</label><input type="number" id="editDep2" placeholder="—" min="50" max="900" autocomplete="off"/><span class="dep-hint" id="editDepHint2"></span></div>
+        <div class="dep-field"><label>Souffle 3</label><input type="number" id="editDep3" placeholder="—" min="50" max="900" autocomplete="off"/><span class="dep-hint" id="editDepHint3"></span></div>
+      </div>
+      <div class="dep-avg-display" id="editDepAvgDisplay" style="display:none">
+        <span class="dep-avg-label">Moyenne calculée</span>
+        <span class="dep-avg-value" id="editDepAvgValue">—</span>
+      </div>
+    </div>
+    <div class="field"><label>SpO₂ (%)</label><div class="spo2-wrap"><input type="number" id="editSpO2" min="70" max="100" autocomplete="off"/><span class="spo2-hint" id="editSpo2Hint">⚠ Hors limites (70–100)</span></div></div>
+    <div class="field">
+      <label>Prises Easyhaler</label>
+      <div class="easyhaler-btns" id="editEasyBtns">
+        <button class="easyh-btn" data-val="0" data-action="selectEditEasy" data-val="0">0</button>
+        <button class="easyh-btn" data-val="1" data-action="selectEditEasy" data-val="1">1</button>
+        <button class="easyh-btn" data-val="2" data-action="selectEditEasy" data-val="2">2</button>
+        <button class="easyh-btn" data-val="3" data-action="selectEditEasy" data-val="3">3</button>
+        <button class="easyh-btn" data-val="4" data-action="selectEditEasy" data-val="4">4</button>
+        <button class="easyh-btn" data-val="5" data-action="selectEditEasy" data-val="5">5</button>
+      </div>
+    </div>
+    <div class="field"><label>Commentaire</label><textarea id="editComment" maxlength="500" placeholder="Symptômes, contexte…"></textarea></div>
+    <button class="btn-primary" id="saveEditBtn" data-action="saveEdit">Enregistrer les modifications</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="app.js" defer></script>
+</body>
+</html>
