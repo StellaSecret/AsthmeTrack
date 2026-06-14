@@ -116,6 +116,10 @@ test.describe('Rappels — scheduling & notifications', () => {
       };
     });
     await page.goto('/app/app.html');
+
+    // Wait for scheduleReminders to run
+    await page.waitForFunction(() => (window as any).__setTimeoutCallCount >= 1);
+
     const count = await page.evaluate(() => (window as any).__setTimeoutCallCount);
     expect(count).toBeGreaterThanOrEqual(1);
   });
