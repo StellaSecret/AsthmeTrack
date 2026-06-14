@@ -16,7 +16,7 @@ test.describe('Export PDF', () => {
       fakeMeasure({ id: 2, dt: '2025-01-16T08:00', dep: 380, dep1: 375, dep2: 380, dep3: 385, spo2: 96, easy: 2, comment: '' }),
     ]);
     await seedBestDEP(page, 450);
-    await page.goto('/');
+    await page.goto('/app/app.html');
   });
 
   test('le bouton PDF déclenche un téléchargement', async ({ page }) => {
@@ -47,7 +47,7 @@ test.describe('Export PDF', () => {
   test('export PDF sur données vides affiche un toast d\'erreur', async ({ page }) => {
     // Override beforeEach seeding by clearing again
     await clearIDB(page);
-    await page.goto('/');
+    await page.goto('/app/app.html');
     await goToTab(page, 'historique');
 
     await page.locator('.icon-btn[title="Exporter PDF"]').click();

@@ -1971,6 +1971,35 @@ document.addEventListener('click', (e) => {
 document.addEventListener('DOMContentLoaded', async ()=>{
   await DB.load();
   await SecureStore.init();
+
+  // Demo mode check
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('demo') === 'true') {
+    const appTitle = document.getElementById('appTitle');
+    if (appTitle) appTitle.innerHTML += ' <span style="color:var(--accent); font-size:12px;">(DÉMO)</span>';
+
+    const mockMeasures = [];
+    const now = Date.now();
+    for (let i = 13; i >= 0; i--) {
+      const dt = new Date(now - i * 86400000);
+      const dep = 350 + Math.floor(Math.random() * 100);
+      mockMeasures.push({
+        id: 100 + i,
+        dt: dt.toISOString(),
+        dep: dep,
+        dep1: dep - 10,
+        dep2: dep + 10,
+        dep3: dep,
+        spo2: 95 + Math.floor(Math.random() * 4),
+        easy: Math.floor(Math.random() * 3),
+        comment: i === 0 ? 'Sensation de légèreté' : (i % 3 === 0 ? 'Pollens élevés' : '')
+      });
+    }
+    DB._state.measures = mockMeasures.reverse();
+    DB._state.bestDEP = 450;
+    showToast('Mode Démo : données simulées');
+  }
+
   applyTheme(isDark());
   applyFont(isCustomFont()); // re-apply after DOM ready (link element now accessible)
   document.documentElement.lang = _lang;
