@@ -50,9 +50,10 @@
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   body { background: var(--bg); color: var(--text); font-family: var(--font-mono); font-size: 16px; min-height: 100vh; overflow-x: hidden; }
 
-  .app-header { position: sticky; top: 0; z-index: 100; background: var(--header-bg, rgba(13,15,20,0.92)); backdrop-filter: blur(16px); border-bottom: 1px solid var(--border); padding: 16px 20px 12px; display: flex; align-items: center; justify-content: space-between; }
-  .app-header h1 { font-family: var(--font-head); font-size: 20px; font-weight: 800; letter-spacing: -0.5px; background: linear-gradient(135deg, var(--accent), var(--green)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-  .header-right { display: flex; align-items: center; gap: 8px; }
+  .app-header { position: sticky; top: 0; z-index: 100; background: var(--header-bg, rgba(13,15,20,0.92)); backdrop-filter: blur(16px); border-bottom: 1px solid var(--border); padding: 16px 20px 12px; display: grid; grid-template-columns: 40px 1fr 40px; align-items: center; }
+  .back-link { color: var(--accent); font-size: 24px; text-decoration: none; padding: 4px; display: flex; align-items: center; }
+  .app-header h1 { font-family: var(--font-head); font-size: 20px; font-weight: 800; letter-spacing: -0.5px; background: linear-gradient(135deg, var(--accent), var(--green)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-align: center; }
+  .header-right { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
   .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite; }
   .status-dot.syncing { background: var(--yellow); box-shadow: 0 0 8px var(--yellow); }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }

@@ -18,7 +18,7 @@ test.describe('XSS — reminder label and time (#1 #3)', () => {
 
   test('reminder label with XSS payload is escaped in the settings list', async ({ page }) => {
     await seedReminders(page, [{ time: '08:00', label: XSS, active: true }]);
-    await page.goto('/');
+    await page.goto('/app/app.html');
     await goToTab(page, 'settings');
     await expect(page.locator('#page-settings .reminder-label-text').first()).toContainText('<img');
     expect(await xssExecuted(page)).toBe(false);
@@ -26,7 +26,7 @@ test.describe('XSS — reminder label and time (#1 #3)', () => {
 
   test('reminder time with XSS payload is escaped in the settings list', async ({ page }) => {
     await seedReminders(page, [{ time: XSS, label: 'Normal', active: true }]);
-    await page.goto('/');
+    await page.goto('/app/app.html');
     await goToTab(page, 'settings');
     await expect(page.locator('#page-settings .reminder-time').first()).toContainText('<img');
     expect(await xssExecuted(page)).toBe(false);
@@ -36,7 +36,7 @@ test.describe('XSS — reminder label and time (#1 #3)', () => {
     await seedReminders(page, [{ time: '09:00', label: XSS, active: true }]);
     await seedMeasures(page, [fakeMeasure()]);
     await seedBestDEP(page, 450);
-    await page.goto('/');
+    await page.goto('/app/app.html');
     // Dashboard renders active reminders as .reminder-badge
     await page.waitForSelector('#dashboardContent .reminder-badge');
     await expect(page.locator('#dashboardContent .reminder-badge').first()).toContainText('<img');
@@ -45,7 +45,7 @@ test.describe('XSS — reminder label and time (#1 #3)', () => {
 
   test('reminder label with script tag is escaped, not executed', async ({ page }) => {
     await seedReminders(page, [{ time: '10:00', label: XSS_SCRIPT, active: true }]);
-    await page.goto('/');
+    await page.goto('/app/app.html');
     await goToTab(page, 'settings');
     expect(await xssExecuted(page)).toBe(false);
   });
@@ -60,7 +60,7 @@ test.describe('XSS — measure comment in dashboard (#2)', () => {
   test('comment with XSS payload is escaped in the dashboard card', async ({ page }) => {
     await seedMeasures(page, [fakeMeasure({ comment: XSS })]);
     await seedBestDEP(page, 450);
-    await page.goto('/');
+    await page.goto('/app/app.html');
     await page.waitForSelector('#dashboardContent .card');
     // The comment should appear as literal text, not trigger onerror
     const cardText = await page.locator('#dashboardContent').innerText();
@@ -71,7 +71,7 @@ test.describe('XSS — measure comment in dashboard (#2)', () => {
   test('comment with script tag does not execute in dashboard', async ({ page }) => {
     await seedMeasures(page, [fakeMeasure({ comment: XSS_SCRIPT })]);
     await seedBestDEP(page, 450);
-    await page.goto('/');
+    await page.goto('/app/app.html');
     await page.waitForSelector('#dashboardContent .card');
     expect(await xssExecuted(page)).toBe(false);
   });
@@ -86,7 +86,7 @@ test.describe('XSS — measure comment in history (#7 #8)', () => {
   test('comment with XSS payload is escaped in the history item', async ({ page }) => {
     await seedMeasures(page, [fakeMeasure({ comment: XSS })]);
     await seedBestDEP(page, 450);
-    await page.goto('/');
+    await page.goto('/app/app.html');
     await goToTab(page, 'historique');
     await page.waitForSelector('#page-historique .history-item');
     const itemText = await page.locator('#page-historique .history-comment').first().innerText();
@@ -97,7 +97,7 @@ test.describe('XSS — measure comment in history (#7 #8)', () => {
   test('comment with script tag does not execute in history', async ({ page }) => {
     await seedMeasures(page, [fakeMeasure({ comment: XSS_SCRIPT })]);
     await seedBestDEP(page, 450);
-    await page.goto('/');
+    await page.goto('/app/app.html');
     await goToTab(page, 'historique');
     expect(await xssExecuted(page)).toBe(false);
   });
@@ -105,7 +105,7 @@ test.describe('XSS — measure comment in history (#7 #8)', () => {
   test('edited comment with XSS payload is escaped after saving edit', async ({ page }) => {
     await seedMeasures(page, [fakeMeasure({ id: 1, dt: '2025-01-15T08:00', dep: 380, dep1: 380, dep2: 380, dep3: 380 })]);
     await seedBestDEP(page, 450);
-    await page.goto('/');
+    await page.goto('/app/app.html');
     await goToTab(page, 'historique');
     await page.locator('#page-historique .history-item .icon-action-btn.edit').first().click();
     await page.locator('#editComment').fill(XSS);
@@ -125,7 +125,7 @@ test.describe('Token storage (#9)', () => {
 
   test('driveToken setter uses SecureStore and does not commit to localStorage', async ({ page }) => {
     await page.addInitScript(() => { (window as any).__savedKey = undefined; });
-    await page.goto('/');
+    await page.goto('/app/app.html');
     await page.exposeFunction('__trackSave', (key: string, value: string) => {
       (global as any).__savedKey = key; // this is for the test node process
     });
@@ -149,7 +149,7 @@ test.describe('Token storage (#9)', () => {
   });
 
   test('clearing driveToken removes it from SecureStore', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/app.html');
     let removedKey = 'not-set';
     await page.exposeFunction('__trackRemove', (key: string) => { removedKey = key; });
     await page.evaluate(async () => {
@@ -162,7 +162,7 @@ test.describe('Token storage (#9)', () => {
   });
 
   test('driveTokenExpiry is written via SecureStore (async)', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/app.html');
     let savedKey = 'not-set';
     await page.exposeFunction('__trackExpirySave', (key: string) => { savedKey = key; });
     await page.evaluate(async () => {
@@ -192,7 +192,7 @@ test.describe('Health data storage (#12)', () => {
         }}
       };
     });
-    await page.goto('/');
+    await page.goto('/app/app.html');
     await page.evaluate(async () => {
       await (window as any).DB.load();
       (window as any).DB.profile = { sex: 'M', age: 30, height: 180 };
@@ -213,7 +213,7 @@ test.describe('Health data storage (#12)', () => {
         }}
       };
     });
-    await page.goto('/');
+    await page.goto('/app/app.html');
     await page.evaluate(async () => {
       (window as any).DB.measures = [{ id: 1, dt: '2025-01-01T10:00', dep: 400 }];
     });
@@ -305,7 +305,7 @@ test.describe('XSS — driveUser and driveAvatar in settings (fix 1)', () => {
         }}
       };
     });
-    await page.goto('/');
+    await page.goto('/app/app.html');
     await goToTab(page, 'settings');
     // Settings render is async now, wait for the element
     const driveName = page.locator('#page-settings .drive-name');
@@ -330,7 +330,7 @@ test.describe('XSS — driveUser and driveAvatar in settings (fix 1)', () => {
         }}
       };
     });
-    await page.goto('/');
+    await page.goto('/app/app.html');
     await goToTab(page, 'settings');
     // Wait for async render and any potential XSS execution
     await page.waitForTimeout(1000);
@@ -346,7 +346,7 @@ test.describe('Future date validation in saveMeasure (fix 2)', () => {
 
   test('saving a measure with a future date shows an error toast', async ({ page }) => {
     await seedBestDEP(page, 450);
-    await page.goto('/');
+    await page.goto('/app/app.html');
     await goToTab(page, 'saisie');
     const form = page.locator('#page-saisie');
     const future = new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 16);
@@ -363,7 +363,7 @@ test.describe('Future date validation in saveMeasure (fix 2)', () => {
 
   test('saving a measure with a past date succeeds normally', async ({ page }) => {
     await seedBestDEP(page, 450);
-    await page.goto('/');
+    await page.goto('/app/app.html');
     await goToTab(page, 'saisie');
     const form = page.locator('#page-saisie');
     await form.locator('#inputDatetime').fill('2024-01-15T08:00');
@@ -383,7 +383,7 @@ test.describe('Future date validation in saveMeasure (fix 2)', () => {
 test.describe('localStorage quota error handled (fix 3)', () => {
 
   test('DB.measures setter does not throw when localStorage is full', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/app.html');
     const threw = await page.evaluate(async () => {
       // Simulate QuotaExceededError in SecureStore which uses localStorage on web
       const orig = localStorage.setItem.bind(localStorage);
@@ -401,7 +401,7 @@ test.describe('localStorage quota error handled (fix 3)', () => {
   });
 
   test('DB.reminders setter does not throw when localStorage is full', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/app.html');
     const threw = await page.evaluate(async () => {
       const orig = localStorage.setItem.bind(localStorage);
       Storage.prototype.setItem = () => { throw new DOMException('QuotaExceededError'); };
@@ -425,20 +425,20 @@ test.describe('localStorage quota error handled (fix 3)', () => {
 test.describe('CSP does not include api.anthropic.com (fix 4)', () => {
 
   test('Content-Security-Policy meta tag does not reference api.anthropic.com', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/app.html');
     const csp = await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content');
     expect(csp).not.toContain('api.anthropic.com');
   });
 
   test('CSP still allows googleapis.com and accounts.google.com (fix 4)', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/app.html');
     const csp = await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content');
     expect(csp).toContain('https://www.googleapis.com');
     expect(csp).toContain('https://accounts.google.com');
   });
 
   test('CSP does not contain unsafe-inline for script-src (#11)', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/app/app.html');
     const csp = await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content');
     const scriptSrc = csp?.split(';').find(s => s.trim().startsWith('script-src'));
     expect(scriptSrc).not.toContain("'unsafe-inline'");
