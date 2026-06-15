@@ -1088,27 +1088,43 @@ function renderDashboard(){
 
 function drawLineChart(id,labels,data,color,yMin,yMax){
   const canvas=document.getElementById(id);if(!canvas)return;
-  const dpr=window.devicePixelRatio||1,W=canvas.offsetWidth||300,H=120;
+  // H matches .chart-wrap height in CSS (180px). Use 2x DPR minimum for sharpness.
+  const dpr=Math.max(window.devicePixelRatio||1,2),W=canvas.offsetWidth||600,H=180;
   canvas.width=W*dpr;canvas.height=H*dpr;canvas.style.width=W+'px';canvas.style.height=H+'px';
   const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);
-  const pad={top:10,right:10,bottom:30,left:38},w=W-pad.left-pad.right,h=H-pad.top-pad.bottom;
-  // Ajuste les bornes dynamiquement pour que les points extrêmes restent visibles
-  if(data.length){const lo=Math.min(...data),hi=Math.max(...data);yMin=Math.min(yMin,lo);yMax=Math.max(yMax,hi);}
+  const FONT_SIZE=11,pad={top:10,right:12,bottom:28,left:42},w=W-pad.left-pad.right,h=H-pad.top-pad.bottom;
+  const FONT='500 '+FONT_SIZE+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+  // Tight dynamic range: add 5% padding around actual data min/max
+  if(data.length){
+    const lo=Math.min(...data),hi=Math.max(...data);
+    const margin=(hi-lo)*0.15||5;
+    yMin=lo-margin; yMax=hi+margin;
+  }
   const range=yMax-yMin||1,toX=i=>pad.left+(i/(data.length-1||1))*w,toY=v=>pad.top+h-((v-yMin)/range)*h;
   ctx.clearRect(0,0,W,H);if(!data.length)return;
-  const _gridCol=getComputedStyle(document.documentElement).getPropertyValue('--border').trim()||'rgba(200,210,220,0.3)';
-  ctx.strokeStyle=_gridCol+'88';ctx.lineWidth=1;
-  [0.25,0.5,0.75].forEach(t=>{const y=pad.top+h*(1-t);ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(pad.left+w,y);ctx.stroke();ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--muted').trim()||'#6b7280';ctx.font='9px ' + getComputedStyle(document.documentElement).getPropertyValue('--font-mono').trim();ctx.fillText(Math.round(yMin+range*t),0,y+3);});
-  // Also draw the top label without the grid line
-  const t=1; const y=pad.top+h*(1-t); ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--muted').trim()||'#6b7280';ctx.font='9px ' + getComputedStyle(document.documentElement).getPropertyValue('--font-mono').trim();ctx.fillText(Math.round(yMin+range*t),0,y+3);
-  const grad=ctx.createLinearGradient(0,pad.top,0,pad.top+h);grad.addColorStop(0,color+'40');grad.addColorStop(1,'transparent');
+  const _gridCol='rgba(200,210,220,0.12)';
+  const _mutedCol=getComputedStyle(document.documentElement).getPropertyValue('--muted').trim()||'#6b7280';
+  // Y grid lines and labels — pick 4 nice round values
+  const nTicks=4;
+  ctx.strokeStyle=_gridCol;ctx.lineWidth=1;
+  for(let i=0;i<=nTicks;i++){
+    const v=yMin+(range/nTicks)*i,y=toY(v);
+    ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(pad.left+w,y);ctx.stroke();
+    ctx.fillStyle=_mutedCol;ctx.font=FONT;ctx.textAlign='right';
+    ctx.fillText(Math.round(v),pad.left-6,y+FONT_SIZE*0.35);
+  }
+  // Gradient fill under line
+  const grad=ctx.createLinearGradient(0,pad.top,0,pad.top+h);grad.addColorStop(0,color+'55');grad.addColorStop(1,color+'00');
   if(data.length>1){ctx.beginPath();ctx.moveTo(toX(0),toY(data[0]));data.forEach((v,i)=>{if(i>0)ctx.lineTo(toX(i),toY(v));});ctx.lineTo(toX(data.length-1),pad.top+h);ctx.lineTo(toX(0),pad.top+h);ctx.closePath();ctx.fillStyle=grad;ctx.fill();}
-  ctx.beginPath();ctx.strokeStyle=color;ctx.lineWidth=2;ctx.lineJoin='round';
+  // Line
+  ctx.beginPath();ctx.strokeStyle=color;ctx.lineWidth=2;ctx.lineJoin='round';ctx.lineCap='round';
   data.forEach((v,i)=>{if(i===0)ctx.moveTo(toX(i),toY(v));else ctx.lineTo(toX(i),toY(v));});ctx.stroke();
-  data.forEach((v,i)=>{ctx.beginPath();ctx.arc(toX(i),toY(v),3,0,Math.PI*2);ctx.fillStyle=color;ctx.fill();ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()||'#0d0f14';ctx.lineWidth=1.5;ctx.stroke();});
-  ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--muted').trim()||'#6b7280';ctx.font='9px DM Mono,monospace';ctx.textAlign='center';
-  const step=Math.max(1,Math.floor(labels.length/5));
-  labels.forEach((l,i)=>{if(i%step===0||i===labels.length-1)ctx.fillText(l,toX(i),H-6);});
+  // Dots — small solid filled circles, no ring
+  data.forEach((v,i)=>{ctx.beginPath();ctx.arc(toX(i),toY(v),3,0,Math.PI*2);ctx.fillStyle=color;ctx.fill();});
+  // X labels
+  ctx.fillStyle=_mutedCol;ctx.font=FONT;ctx.textAlign='center';
+  const step=Math.max(1,Math.ceil(labels.length/7));
+  labels.forEach((l,i)=>{if(i%step===0||i===labels.length-1)ctx.fillText(l,toX(i),H-8);});
 }
 
 
@@ -1247,9 +1263,90 @@ async function _doExportPDF(measures){
   doc.text(t('pdf_footer',sorted.length),10,292);
 
   // ── Page 2 : Graphes DEP et SpO₂ ──────────────────────────────────────
-  const canvasDep = document.getElementById('chartDEP');
-  const canvasSpo = document.getElementById('chartSPO2');
-  if (canvasDep || canvasSpo) {
+  // Build data for charts from measures (chronological order, last 14)
+  const chartRecent = [...measures].sort((a,b)=>new Date(a.dt)-new Date(b.dt)).slice(-14);
+  if (chartRecent.length > 0) {
+    const chartLabels = chartRecent.map(m=>{const d=new Date(m.dt);return d.getDate()+'/'+(d.getMonth()+1);});
+    const depData  = chartRecent.map(m=>m.dep);
+    const spo2Data = chartRecent.map(m=>m.spo2);
+
+    // Draw a chart onto a dedicated off-screen canvas at fixed high resolution.
+    // This is independent of the on-screen canvas size, guaranteeing sharp PDF output.
+    const renderChartToImg = (labels, data, color) => {
+      const PX = 1800, PY = 540; // fixed pixel size: sharp at any DPI
+      const oc = document.createElement('canvas');
+      oc.width = PX; oc.height = PY;
+      const ctx = oc.getContext('2d');
+      const FONT_SIZE = 28;
+      const FONT = '500 ' + FONT_SIZE + 'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+      const pad = {top:30, right:30, bottom:72, left:110};
+      const w = PX - pad.left - pad.right, h = PY - pad.top - pad.bottom;
+
+      // Background
+      ctx.fillStyle = '#1e222d';
+      ctx.fillRect(0, 0, PX, PY);
+
+      // Dynamic Y range with 15% margin
+      const lo = Math.min(...data), hi = Math.max(...data);
+      const margin = (hi - lo) * 0.15 || 5;
+      const yMin = lo - margin, yMax = hi + margin;
+      const range = yMax - yMin || 1;
+
+      const toX = i => pad.left + (i / (data.length - 1 || 1)) * w;
+      const toY = v => pad.top + h - ((v - yMin) / range) * h;
+
+      // Grid lines + Y labels
+      const gridCol = 'rgba(200,210,220,0.12)';
+      const mutedCol = '#8892a4';
+      ctx.strokeStyle = gridCol;
+      ctx.lineWidth = 2;
+      ctx.font = FONT;
+      ctx.textAlign = 'right';
+      ctx.fillStyle = mutedCol;
+      const nTicks = 4;
+      for (let i = 0; i <= nTicks; i++) {
+        const v = yMin + (range / nTicks) * i;
+        const y = toY(v);
+        ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + w, y); ctx.stroke();
+        ctx.fillText(Math.round(v), pad.left - 14, y + FONT_SIZE * 0.35);
+      }
+
+      // Gradient fill
+      const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + h);
+      grad.addColorStop(0, color + '55'); grad.addColorStop(1, color + '00');
+      if (data.length > 1) {
+        ctx.beginPath();
+        ctx.moveTo(toX(0), toY(data[0]));
+        data.forEach((v,i) => { if(i>0) ctx.lineTo(toX(i), toY(v)); });
+        ctx.lineTo(toX(data.length-1), pad.top+h);
+        ctx.lineTo(toX(0), pad.top+h);
+        ctx.closePath();
+        ctx.fillStyle = grad; ctx.fill();
+      }
+
+      // Line
+      ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 5;
+      ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+      data.forEach((v,i) => { if(i===0) ctx.moveTo(toX(i),toY(v)); else ctx.lineTo(toX(i),toY(v)); });
+      ctx.stroke();
+
+      // Dots
+      data.forEach((v,i) => {
+        ctx.beginPath(); ctx.arc(toX(i), toY(v), 8, 0, Math.PI*2);
+        ctx.fillStyle = color; ctx.fill();
+      });
+
+      // X labels
+      ctx.fillStyle = mutedCol; ctx.font = FONT; ctx.textAlign = 'center';
+      const step = Math.max(1, Math.ceil(labels.length / 7));
+      labels.forEach((l,i) => {
+        if (i % step === 0 || i === labels.length - 1)
+          ctx.fillText(l, toX(i), PY - 18);
+      });
+
+      return oc.toDataURL('image/png', 1.0);
+    };
+
     doc.addPage();
     doc.setFillColor(...dark); doc.rect(0,0,210,297,'F');
     doc.setFillColor(...blue); doc.rect(0,0,210,12,'F');
@@ -1257,44 +1354,24 @@ async function _doExportPDF(measures){
     doc.text(t('pdf_charts_title'),10,9);
 
     let gy = 22;
-    // Adjusted chart dimensions to maintain 600x240 aspect ratio (2.5)
-    const chartW = 190, chartH = 76;
+    const chartW = 190, chartH = 80;
 
-    // Helper to capture high-res canvas
-    const getHighResImg = (canvas) => {
-        // Use the actual canvas internal resolution
-        const ratio = 3;
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = canvas.width * ratio;
-        tempCanvas.height = canvas.height * ratio;
-        const ctx = tempCanvas.getContext('2d');
-        ctx.scale(ratio, ratio);
-        ctx.drawImage(canvas, 0, 0);
-        return tempCanvas.toDataURL('image/png', 1.0);
-    };
+    try {
+      const imgDep = renderChartToImg(chartLabels, depData, '#4f9cf9');
+      doc.setFillColor(30,34,45); doc.rect(8,gy-5,194,chartH+10,'F');
+      doc.setTextColor(...blue); doc.setFontSize(8); doc.setFont('helvetica','bold');
+      doc.text(t('pdf_dep_label'),10,gy);
+      doc.addImage(imgDep,'PNG',10,gy+3,chartW,chartH);
+      gy += chartH + 16;
+    } catch(e) { console.warn('PDF chart DEP error:', e); }
 
-    if (canvasDep && canvasDep.width > 0) {
-      try {
-        const imgDep = getHighResImg(canvasDep);
-        doc.setFillColor(30,34,45); doc.rect(8,gy-5,194,chartH+12,'F');
-        doc.setTextColor(...blue); doc.setFontSize(8); doc.setFont('helvetica','bold');
-        doc.text(t('pdf_dep_label'),10,gy);
-        doc.addImage(imgDep,'PNG',10,gy+2,chartW,chartH);
-        gy += chartH + 18;
-      } catch(e) { console.warn('PDF chart DEP error:', e); }
-    }
-
-    if (canvasSpo && canvasSpo.width > 0) {
-      try {
-        const imgSpo = getHighResImg(canvasSpo);
-        doc.setFillColor(30,34,45); doc.rect(8,gy-5,194,chartH+12,'F');
-        doc.setTextColor(16,217,160); doc.setFontSize(8); doc.setFont('helvetica','bold');
-        doc.text(t('pdf_spo2_label'),10,gy);
-        doc.addImage(imgSpo,'PNG',10,gy+2,chartW,chartH);
-        gy += chartH + 18;
-
-      } catch(e) { console.warn('PDF chart SpO2 error:', e); }
-    }
+    try {
+      const imgSpo = renderChartToImg(chartLabels, spo2Data, '#10d9a0');
+      doc.setFillColor(30,34,45); doc.rect(8,gy-5,194,chartH+10,'F');
+      doc.setTextColor(16,217,160); doc.setFontSize(8); doc.setFont('helvetica','bold');
+      doc.text(t('pdf_spo2_label'),10,gy);
+      doc.addImage(imgSpo,'PNG',10,gy+3,chartW,chartH);
+    } catch(e) { console.warn('PDF chart SpO2 error:', e); }
 
     doc.setTextColor(60,70,90); doc.setFontSize(7);
     doc.text(t('pdf_charts_footer'),10,292);

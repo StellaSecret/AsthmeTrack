@@ -90,7 +90,7 @@
   .metric-pct { font-size: 14px; color: var(--muted); margin-top: 4px; }
   .dep-measurements { font-size: 13px; color: var(--muted); margin-top: 4px; }
 
-  .chart-wrap { position: relative; height: 120px; margin-top: 8px; }
+  .chart-wrap { position: relative; height: 180px; margin-top: 8px; }
   canvas { width: 100% !important; }
 
   .field { margin-bottom: 16px; }
