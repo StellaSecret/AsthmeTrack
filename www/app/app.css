@@ -15,8 +15,9 @@
     --yellow-dim: rgba(245,166,35,0.12);
     --red-dim: rgba(240,79,79,0.12);
     --radius: 14px;
-    --font-head: 'Syne', sans-serif;
-    --font-mono: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'Courier New', monospace; /* system stack — overridden to DM Mono when custom font pref is on */
+    --font-head: 'Outfit', sans-serif;
+    --font-mono: 'Lexend', sans-serif;
+    --font-data: 'JetBrains Mono', monospace;
   }
   /* ── Light theme ────────────────────────────────────────────────────────── */
   html[data-theme="light"] {
@@ -85,10 +86,10 @@
   .metric-box.yellow::before { background: var(--yellow); }
   .metric-box.red::before { background: var(--red); }
   .metric-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
-  .metric-value { font-family: var(--font-head); font-size: 30px; font-weight: 800; line-height: 1; }
+  .metric-value { font-family: var(--font-data); font-size: 30px; font-weight: 700; line-height: 1; }
   .metric-unit { font-family: var(--font-mono); font-size: 13px; color: var(--muted); margin-top: 2px; }
-  .metric-pct { font-size: 14px; color: var(--muted); margin-top: 4px; }
-  .dep-measurements { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .metric-pct { font-family: var(--font-data); font-size: 14px; color: var(--muted); margin-top: 4px; }
+  .dep-measurements { font-family: var(--font-data); font-size: 13px; color: var(--muted); margin-top: 4px; }
 
   .chart-wrap { position: relative; height: 180px; margin-top: 8px; }
   canvas { width: 100% !important; }
@@ -106,7 +107,7 @@
   .dep-field input:focus { border-color: var(--accent); }
   .dep-avg-display { background: rgba(79,156,249,.08); border: 1px solid rgba(79,156,249,.3); border-radius: 10px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
   .dep-avg-label { font-size: 13px; color: var(--muted); }
-  .dep-avg-value { font-family: var(--font-head); font-size: 22px; font-weight: 800; color: var(--accent); }
+  .dep-avg-value { font-family: var(--font-data); font-size: 22px; font-weight: 700; color: var(--accent); }
 
   .easyhaler-btns { display: flex; gap: 6px; }
   .easyh-btn { flex: 1; padding: 14px 4px; background: var(--surface2); border: 2px solid var(--border); border-radius: 10px; color: var(--muted); font-family: var(--font-head); font-size: 20px; font-weight: 700; cursor: pointer; transition: all .15s; text-align: center; }

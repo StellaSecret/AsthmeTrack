@@ -241,7 +241,7 @@ const LANG = {
     settings_lang_label: 'Langue / Language',
     settings_font_label: 'Police de caractères',
     settings_font_system: 'Système',
-    settings_font_custom: 'DM Mono',
+    settings_font_custom: 'Lexend',
     settings_zones_title: 'Zones de référence',
     zone_green_desc: 'DEP ≥ 80% · SpO₂ ≥ 95%',
     zone_yellow_desc: 'DEP 60–80% · SpO₂ 90–94%',
@@ -401,7 +401,7 @@ const LANG = {
     settings_lang_label: 'Langue / Language',
     settings_font_label: 'Font',
     settings_font_system: 'System',
-    settings_font_custom: 'DM Mono',
+    settings_font_custom: 'Lexend',
     settings_zones_title: 'Reference zones',
     zone_green_desc: 'PEF ≥ 80% · SpO₂ ≥ 95%',
     zone_yellow_desc: 'PEF 60–80% · SpO₂ 90–94%',
@@ -529,17 +529,18 @@ function applyTheme(dark) {
 function isDark() { return localStorage.getItem('at_theme') !== 'light'; }
 
 // ── Font preference ──────────────────────────────────────────────────────────
-// 'system' (default) → system mono stack, no DM Mono network request
-// 'custom'           → loads DM Mono from Google Fonts
-const SYSTEM_MONO  = "ui-monospace,'Cascadia Code','Source Code Pro',Menlo,Consolas,'Courier New',monospace";
-const CUSTOM_MONO  = "'DM Mono',ui-monospace,monospace";
+// 'system'           → standard sans-serif system stack
+// 'custom' (default) → Lexend (modern aesthetic)
+const SYSTEM_MONO  = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+const CUSTOM_MONO  = "'Lexend',sans-serif";
 
-function isCustomFont() { return localStorage.getItem('at_font') === 'custom'; }
+function isCustomFont() {
+  const saved = localStorage.getItem('at_font');
+  return saved === null || saved === 'custom'; // Lexend is now default
+}
 
 function applyFont(custom) {
   localStorage.setItem('at_font', custom ? 'custom' : 'system');
-  const link = document.getElementById('dmMonoLink');
-  if (link) link.disabled = !custom;
   document.documentElement.style.setProperty(
     '--font-mono', custom ? CUSTOM_MONO : SYSTEM_MONO
   );
@@ -1885,7 +1886,7 @@ function renderSettings(){
         <div><div class="setting-label">${t('settings_font_label')}</div></div>
         <div style="display:flex;gap:6px">
           <button class="btn-secondary" style="${!isCustomFont()?'border-color:var(--accent);color:var(--accent)':''}" data-action="applyFont" data-val="false">${t('settings_font_system')}</button>
-          <button class="btn-secondary" style="font-family:'DM Mono',monospace;${isCustomFont()?'border-color:var(--accent);color:var(--accent)':''}" data-action="applyFont" data-val="true">${t('settings_font_custom')}</button>
+          <button class="btn-secondary" style="font-family:'Lexend',sans-serif;${isCustomFont()?'border-color:var(--accent);color:var(--accent)':''}" data-action="applyFont" data-val="true">${t('settings_font_custom')}</button>
         </div>
       </div>
     </div>

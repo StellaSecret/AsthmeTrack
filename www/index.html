@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AsthmeTrack — Suivi intelligent de vos mesures respiratoires</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Lexend:wght@300;400;500&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -20,8 +21,9 @@
       --accent2: #7c3aed;
       --green: #10d9a0;
       --red: #f97316;
-      --font-head: 'Syne', sans-serif;
-      --mono: 'DM Mono', monospace;
+      --font-head: 'Outfit', sans-serif;
+      --mono: 'Lexend', sans-serif;
+      --font-data: 'JetBrains Mono', monospace;
       --radius: 10px;
       --nav-bg: rgba(13,15,20,0.92);
     }
@@ -122,7 +124,7 @@
       display: flex; align-items: baseline; gap: 0.4rem; margin-bottom: 0.25rem;
     }
     .hv-metric-val {
-      font-family: var(--font-head); font-size: 2rem; font-weight: 800;
+      font-family: var(--font-data); font-size: 2rem; font-weight: 700;
       background: linear-gradient(135deg, var(--accent), var(--green));
       -webkit-background-clip: text; -webkit-text-fill-color: transparent;
     }

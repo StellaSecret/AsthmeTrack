@@ -597,7 +597,7 @@ test.describe('i18n — language switch', () => {
     await page.goto('/app/app.html');
     await goToTab(page, 'settings');
     // Click EN button
-    await page.locator('#settingsContent button.btn-secondary', { hasText: 'EN' }).click();
+    await page.getByRole('button', { name: 'EN', exact: true }).click();
     await expect(page.locator('#settingsContent')).toContainText('Appearance');
   });
 
@@ -664,45 +664,41 @@ test.describe('Theme toggle', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 test.describe('Font toggle', () => {
 
-  test('default font is system (DM Mono link disabled)', async ({ page }) => {
+  test('default font is custom (Lexend)', async ({ page }) => {
     await page.goto('/app/app.html');
-    const disabled = await page.locator('#dmMonoLink').getAttribute('disabled');
-    // attribute present means disabled
-    expect(disabled).not.toBeNull();
+    const fontMono = await page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue('--font-mono')
+    );
+    expect(fontMono).toContain('Lexend');
   });
 
-  test('selecting DM Mono enables the font link', async ({ page }) => {
-    await page.goto('/app/app.html');
-    await goToTab(page, 'settings');
-    await page.locator('#settingsContent button', { hasText: 'DM Mono' }).click();
-    const disabled = await page.locator('#dmMonoLink').getAttribute('disabled');
-    expect(disabled).toBeNull(); // no longer disabled
-  });
-
-  test('selecting System re-disables the font link', async ({ page }) => {
-    await seedFont(page, 'custom');
+  test('selecting System switches to system sans-serif stack', async ({ page }) => {
     await page.goto('/app/app.html');
     await goToTab(page, 'settings');
     await page.locator('#settingsContent button', { hasText: /Système|System/ }).click();
-    const disabled = await page.locator('#dmMonoLink').getAttribute('disabled');
-    expect(disabled).not.toBeNull();
+    const fontMono = await page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue('--font-mono')
+    );
+    expect(fontMono).toContain('-apple-system');
+  });
+
+  test('selecting Lexend switches the font stack', async ({ page }) => {
+    await seedFont(page, 'system');
+    await page.goto('/app/app.html');
+    await goToTab(page, 'settings');
+    await page.locator('#settingsContent button', { hasText: 'Lexend' }).click();
+    const fontMono = await page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue('--font-mono')
+    );
+    expect(fontMono).toContain('Lexend');
   });
 
   test('font choice persists in localStorage', async ({ page }) => {
     await page.goto('/app/app.html');
     await goToTab(page, 'settings');
-    await page.locator('#settingsContent button', { hasText: 'DM Mono' }).click();
+    await page.locator('#settingsContent button', { hasText: /Système|System/ }).click();
     const stored = await page.evaluate(() => localStorage.getItem('at_font'));
-    expect(stored).toBe('custom');
-  });
-
-  test('system font sets system monospace stack on --font-mono', async ({ page }) => {
-    await seedFont(page, 'system');
-    await page.goto('/app/app.html');
-    const fontMono = await page.evaluate(() =>
-      getComputedStyle(document.documentElement).getPropertyValue('--font-mono')
-    );
-    expect(fontMono).toContain('ui-monospace');
+    expect(stored).toBe('system');
   });
 
 });
