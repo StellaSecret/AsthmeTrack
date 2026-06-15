@@ -4,13 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AsthmeTrack — Suivi intelligent de vos mesures respiratoires</title>
-  <!-- Google Fonts: Same as app -->
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="app/app.css"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
   <style>
-    /* Define Landing Page specific overrides if needed,
-       but ensure the base variables from app.css are available */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
     :root {
       --bg: #0d0f14;
       --surface: #161920;
@@ -21,44 +19,457 @@
       --accent: #4f9cf9;
       --accent2: #7c3aed;
       --green: #10d9a0;
-      --header-bg: rgba(13,15,20,0.9);
+      --red: #f97316;
       --font-head: 'Syne', sans-serif;
-      --radius: 12px;
+      --mono: 'DM Mono', monospace;
+      --radius: 10px;
+      --nav-bg: rgba(13,15,20,0.92);
     }
-    body { background: var(--bg); color: var(--text); font-family: var(--font-head); overflow-x: hidden; margin: 0; }
 
-    .nav { padding: 20px 40px; display: flex; justify-content: space-between; align-items: center; background: var(--header-bg); backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 1000; border-bottom: 1px solid var(--border); }
-    .logo { font-size: 24px; font-weight: 800; color: var(--accent); }
-    .nav-btns { display: flex; gap: 10px; }
+    [data-theme="light"] {
+      --bg: #f4f6fb;
+      --surface: #ffffff;
+      --surface2: #eef1f7;
+      --border: #dde1eb;
+      --text: #0f1117;
+      --muted: #6b7280;
+      --nav-bg: rgba(244,246,251,0.92);
+    }
 
-    .hero { padding: 80px 20px; text-align: center; }
-    .hero h1 { font-size: 48px; margin-bottom: 20px; background: linear-gradient(135deg, var(--accent), var(--green)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    .hero p { font-size: 18px; color: var(--muted); max-width: 600px; margin: 0 auto 30px; }
+    body { background: var(--bg); color: var(--text); font-family: var(--font-head); overflow-x: hidden; transition: background 0.2s, color 0.2s; }
+    a { color: inherit; text-decoration: none; }
 
-    .demo-section { padding: 60px 20px; max-width: 800px; margin: 0 auto; }
-    .card { background: var(--surface); padding: 24px; border-radius: var(--radius); }
+    /* THEME TOGGLE */
+    .theme-toggle {
+      width: 34px; height: 34px; border-radius: 8px;
+      border: 1px solid var(--border); background: var(--surface2);
+      color: var(--muted); cursor: pointer; display: flex; align-items: center;
+      justify-content: center; font-size: 1rem; transition: border-color 0.15s, color 0.15s;
+      flex-shrink: 0;
+    }
+    .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
 
-    .btn-primary { display: inline-block; padding: 16px 32px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border-radius: 12px; color: #fff; font-weight: 700; text-decoration: none; }
+    /* NAV */
+    .nav {
+      position: sticky; top: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.875rem 2rem;
+      background: var(--nav-bg); border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(10px);
+    }
+    .nav-logo {
+      font-family: var(--font-head); font-size: 1.05rem; font-weight: 800;
+      background: linear-gradient(135deg, var(--accent), var(--green));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .nav-links { display: flex; align-items: center; gap: 1.5rem; }
+    .nav-links a { font-family: var(--mono); font-size: 0.78rem; color: var(--muted); transition: color 0.15s; }
+    .nav-links a:hover, .nav-links a.active { color: var(--text); }
+    .nav-cta {
+      padding: 7px 16px; font-family: var(--mono); font-size: 0.78rem;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff; border-radius: 8px; transition: opacity 0.15s;
+    }
+    .nav-cta:hover { opacity: 0.85; }
+
+    /* HERO */
+    .hero {
+      max-width: 900px; margin: 0 auto;
+      padding: 5rem 2rem 4rem;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 4rem; align-items: center;
+    }
+    .hero-eyebrow {
+      font-family: var(--mono); font-size: 0.72rem; color: var(--accent);
+      letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 1.25rem;
+    }
+    .hero-title {
+      font-family: var(--font-head); font-size: clamp(1.7rem, 3vw, 2.5rem);
+      font-weight: 800; line-height: 1.1; letter-spacing: -0.02em; margin-bottom: 1.25rem;
+    }
+    .hero-title em {
+      font-style: normal;
+      background: linear-gradient(135deg, var(--accent), var(--green));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .hero-sub { font-family: var(--mono); font-size: 0.88rem; color: var(--muted); line-height: 1.75; margin-bottom: 2rem; }
+    .hero-cta { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+
+    .btn-primary {
+      padding: 11px 22px; font-family: var(--mono); font-size: 0.82rem;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff; border-radius: 8px; border: none;
+      cursor: pointer; transition: opacity 0.15s; display: inline-block; font-weight: 500;
+    }
+    .btn-primary:hover { opacity: 0.85; }
+    .btn-ghost {
+      padding: 11px 22px; font-family: var(--mono); font-size: 0.82rem;
+      background: transparent; color: var(--text);
+      border: 1px solid var(--border); border-radius: 8px;
+      cursor: pointer; transition: border-color 0.15s; display: inline-block;
+    }
+    .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* HERO VISUAL — mini DEP card */
+    .hero-visual {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 1.5rem;
+    }
+    .hv-label {
+      font-family: var(--mono); font-size: 0.65rem; color: var(--muted);
+      margin-bottom: 1rem; letter-spacing: 0.06em; text-transform: uppercase;
+    }
+    .hv-metric-row {
+      display: flex; align-items: baseline; gap: 0.4rem; margin-bottom: 0.25rem;
+    }
+    .hv-metric-val {
+      font-family: var(--font-head); font-size: 2rem; font-weight: 800;
+      background: linear-gradient(135deg, var(--accent), var(--green));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .hv-metric-unit { font-family: var(--mono); font-size: 0.72rem; color: var(--muted); }
+    .hv-metric-label { font-family: var(--mono); font-size: 0.7rem; color: var(--muted); margin-bottom: 1rem; }
+
+    .hv-bar-section { margin-bottom: 1rem; }
+    .hv-bar-header {
+      display: flex; justify-content: space-between;
+      font-family: var(--mono); font-size: 0.65rem; color: var(--muted); margin-bottom: 0.4rem;
+    }
+    .hv-bar-wrap { height: 6px; background: var(--surface2); border-radius: 4px; overflow: hidden; margin-bottom: 0.35rem; }
+    .hv-bar { height: 100%; border-radius: 4px; transition: width 0.8s ease; }
+
+    .hv-spo2-row {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--surface2); border-radius: 8px; padding: 10px 12px;
+      font-family: var(--mono); font-size: 0.72rem;
+    }
+    .hv-spo2-label { color: var(--muted); }
+    .hv-spo2-val {
+      font-size: 1.1rem; font-weight: 500;
+      background: linear-gradient(135deg, var(--green), var(--accent));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .hv-status {
+      margin-top: 0.75rem; padding: 6px 10px;
+      background: rgba(16, 217, 160, 0.1); border: 1px solid rgba(16,217,160,0.2);
+      border-radius: 6px; font-family: var(--mono); font-size: 0.7rem; color: var(--green);
+    }
+
+    /* DIVIDER */
+    .section-divider { border: none; border-top: 1px solid var(--border); margin: 0 2rem; }
+
+    /* HOW IT WORKS */
+    .how { max-width: 900px; margin: 0 auto; padding: 4rem 2rem; }
+    .section-eyebrow {
+      font-family: var(--mono); font-size: 0.72rem; color: var(--muted);
+      letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 2rem;
+    }
+    .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; }
+    .step-num { font-family: var(--mono); font-size: 0.65rem; color: var(--accent); margin-bottom: 0.5rem; opacity: 0.7; }
+    .step h3 { font-family: var(--font-head); font-size: 0.9rem; font-weight: 700; margin-bottom: 0.4rem; }
+    .step p { font-family: var(--mono); font-size: 0.78rem; color: var(--muted); line-height: 1.65; }
+
+    /* FEATURES */
+    .features { background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .features-inner { max-width: 900px; margin: 0 auto; padding: 4rem 2rem; }
+    .features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; }
+    .feature {
+      border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 1.35rem; background: var(--bg); transition: border-color 0.2s;
+    }
+    .feature:hover { border-color: var(--accent); }
+    .feature-icon { font-size: 1.3rem; margin-bottom: 0.75rem; }
+    .feature h3 { font-family: var(--font-head); font-size: 0.88rem; font-weight: 700; margin-bottom: 0.4rem; }
+    .feature p { font-family: var(--mono); font-size: 0.76rem; color: var(--muted); line-height: 1.65; }
+
+    /* METRICS SECTION */
+    .metrics { max-width: 900px; margin: 0 auto; padding: 4rem 2rem; }
+    .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+    .metric-card {
+      border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 1.5rem; background: var(--surface);
+    }
+    .metric-card h3 { font-family: var(--font-head); font-size: 1rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .metric-card p { font-family: var(--mono); font-size: 0.8rem; color: var(--muted); line-height: 1.65; margin-bottom: 1rem; }
+    .metric-tags { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+    .tag {
+      font-family: var(--mono); font-size: 0.68rem; padding: 3px 9px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 4px; color: var(--muted);
+    }
+
+    /* PRIVACY STRIP */
+    .privacy-strip { background: var(--surface); border-top: 1px solid var(--border); }
+    .privacy-strip-inner {
+      max-width: 900px; margin: 0 auto; padding: 1.5rem 2rem;
+      display: flex; align-items: center; gap: 2rem; flex-wrap: wrap;
+    }
+    .privacy-item {
+      display: flex; align-items: center; gap: 0.5rem;
+      font-family: var(--mono); font-size: 0.75rem; color: var(--muted);
+    }
+    .privacy-item span:first-child { color: var(--green); }
+
+    /* CTA SECTION */
+    .cta { max-width: 900px; margin: 0 auto; padding: 5rem 2rem; text-align: center; }
+    .cta h2 {
+      font-family: var(--font-head); font-size: 1.6rem; font-weight: 800;
+      letter-spacing: -0.02em; margin-bottom: 0.75rem;
+    }
+    .cta p { font-family: var(--mono); font-size: 0.88rem; color: var(--muted); margin-bottom: 2rem; }
+    .cta-buttons { display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; }
+
+    /* FOOTER */
+    footer {
+      border-top: 1px solid var(--border); padding: 1.5rem 2rem;
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;
+    }
+    .footer-logo {
+      font-family: var(--font-head); font-size: 0.9rem; font-weight: 800;
+      background: linear-gradient(135deg, var(--accent), var(--green));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .footer-links { display: flex; gap: 1.5rem; }
+    .footer-links a { font-family: var(--mono); font-size: 0.72rem; color: var(--muted); transition: color 0.15s; }
+    .footer-links a:hover { color: var(--text); }
+    .footer-copy { font-family: var(--mono); font-size: 0.7rem; color: var(--muted); }
+
+    /* RESPONSIVE */
+    @media (max-width: 700px) {
+      .hero { grid-template-columns: 1fr; gap: 2.5rem; padding: 3rem 1.25rem 2.5rem; }
+      .steps { grid-template-columns: 1fr 1fr; }
+      .features-grid { grid-template-columns: 1fr; }
+      .metrics-grid { grid-template-columns: 1fr; }
+      .nav { padding: 0.75rem 1.25rem; }
+    }
+    @media (max-width: 480px) {
+      .steps { grid-template-columns: 1fr; }
+      .privacy-strip-inner { gap: 1rem; }
+    }
   </style>
 </head>
 <body>
 
+<!-- NAV -->
 <nav class="nav">
-  <div class="logo">AsthmeTrack</div>
-  <div class="nav-btns">
-    <a href="app/app.html?demo=true" style="color:var(--text); text-decoration:none; margin-right:1rem; padding: 10px;">Démo</a>
-    <a href="app/app.html" class="btn-primary">Lancer l'App</a>
+  <a class="nav-logo" href="index.html">AsthmeTrack</a>
+  <div class="nav-links">
+    <a href="index.html" class="active">Accueil</a>
+    <a href="app/app.html?demo=true">Démo</a>
+    <a href="https://github.com/StellaSecret/asthmetrack" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://stellasecret.github.io/privacy-pages/asthmetrack/privacy-en.html" target="_blank" rel="noopener">Privacy</a>
+    <button class="theme-toggle" id="themeToggle" title="Basculer le thème" aria-label="Basculer mode clair/sombre">🌙</button>
+    <a href="app/app.html" class="nav-cta">Lancer l'app</a>
   </div>
 </nav>
 
+<!-- HERO -->
 <section class="hero">
-  <h1>Prenez le contrôle de votre asthme</h1>
-  <p>Suivez votre DEP, votre SpO₂ et vos prises de traitement en toute simplicité. Sauvegardez vos données en toute confidentialité sur votre Google Drive.</p>
-  <div style="display: flex; gap: 15px; justify-content: center;">
-    <a href="app/app.html" class="btn-primary">Commencer le suivi</a>
-    <a href="app/app.html?demo=true" style="display:inline-block; padding: 16px 32px; background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; color: var(--text); font-weight: 700; text-decoration: none;">Voir une démo</a>
+  <div class="hero-content">
+    <p class="hero-eyebrow">Asthme &amp; santé respiratoire</p>
+    <h1 class="hero-title">Suivez ce qui <em>compte vraiment</em></h1>
+    <p class="hero-sub">
+      DEP, SpO₂, prises de traitement — tout dans une même vue.
+      Vos données restent les vôtres : sauvegardées sur votre Google Drive, jamais sur nos serveurs.
+    </p>
+    <div class="hero-cta">
+      <a href="app/app.html" class="btn-primary">🫁 Commencer le suivi</a>
+      <a href="app/app.html?demo=true" class="btn-ghost">Voir une démo →</a>
+    </div>
+  </div>
+
+  <!-- Mini DEP preview card -->
+  <div class="hero-visual">
+    <div class="hv-label">Mesure du 15 juin — matin</div>
+
+    <div class="hv-metric-row">
+      <span class="hv-metric-val">87%</span>
+    </div>
+    <div class="hv-metric-label">de votre DEP théorique · Zone verte</div>
+
+    <div class="hv-bar-section">
+      <div class="hv-bar-header"><span>Souffle 1</span><span>430 L/min</span></div>
+      <div class="hv-bar-wrap"><div class="hv-bar" style="width:86%;background:var(--accent)"></div></div>
+      <div class="hv-bar-header"><span>Souffle 2</span><span>445 L/min</span></div>
+      <div class="hv-bar-wrap"><div class="hv-bar" style="width:89%;background:var(--green)"></div></div>
+      <div class="hv-bar-header"><span>Souffle 3</span><span>438 L/min</span></div>
+      <div class="hv-bar-wrap"><div class="hv-bar" style="width:87%;background:var(--accent)"></div></div>
+    </div>
+
+    <div class="hv-spo2-row">
+      <span class="hv-spo2-label">SpO₂</span>
+      <span class="hv-spo2-val">97%</span>
+    </div>
+    <div class="hv-status">✓ Moyenne DEP : 438 L/min — stable depuis 7 jours</div>
   </div>
 </section>
 
+<hr class="section-divider">
+
+<!-- HOW IT WORKS -->
+<section class="how">
+  <p class="section-eyebrow">Comment ça marche</p>
+  <div class="steps">
+    <div class="step">
+      <p class="step-num">01</p>
+      <h3>Saisissez vos mesures</h3>
+      <p>DEP en 3 souffles, SpO₂, et nombre de prises d'Easyhaler. La moyenne DEP est calculée automatiquement.</p>
+    </div>
+    <div class="step">
+      <p class="step-num">02</p>
+      <h3>Visualisez votre évolution</h3>
+      <p>Tableau de bord avec graphiques de tendances. Identifiez d'un coup d'œil les jours difficiles.</p>
+    </div>
+    <div class="step">
+      <p class="step-num">03</p>
+      <h3>Comparez à votre DEP théorique</h3>
+      <p>Entrez votre profil (âge, sexe, taille). L'app calcule votre valeur de référence et affiche votre zone du jour.</p>
+    </div>
+    <div class="step">
+      <p class="step-num">04</p>
+      <h3>Exportez en PDF</h3>
+      <p>Générez un rapport complet de votre historique pour le partager avec votre médecin.</p>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="features">
+  <div class="features-inner">
+    <p class="section-eyebrow">Ce qui rend AsthmeTrack différent</p>
+    <div class="features-grid">
+      <div class="feature">
+        <div class="feature-icon">💨</div>
+        <h3>DEP sur 3 souffles</h3>
+        <p>Saisissez chaque souffle individuellement. La meilleure valeur et la moyenne sont calculées en temps réel.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🩺</div>
+        <h3>Zones de trafic colorées</h3>
+        <p>Vert, orange, rouge — selon votre DEP théorique. Un regard suffit pour évaluer votre état du jour.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">☁️</div>
+        <h3>Google Drive personnel</h3>
+        <p>Vos données sont sauvegardées dans votre propre Drive. Ni serveur tiers, ni partage sans votre accord.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">📄</div>
+        <h3>Export PDF pour le médecin</h3>
+        <p>Rapport complet de l'historique, prêt à imprimer ou à envoyer lors de votre prochain rendez-vous.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">📴</div>
+        <h3>Fonctionne hors ligne</h3>
+        <p>Installez l'app une fois, utilisez-la sans connexion. La synchronisation se fait quand le réseau revient.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🌗</div>
+        <h3>Mode sombre &amp; clair</h3>
+        <p>Interface adaptée à vos préférences. Thème sauvegardé automatiquement entre les sessions.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- METRICS TRACKED -->
+<section class="metrics">
+  <p class="section-eyebrow">Mesures suivies</p>
+  <div class="metrics-grid">
+    <div class="metric-card">
+      <h3>💨 Débit expiratoire de pointe (DEP)</h3>
+      <p>Mesurez votre DEP en 3 souffles consécutifs. Comparez au fil du temps avec votre valeur théorique calculée selon votre profil.</p>
+      <div class="metric-tags">
+        <span class="tag">3 souffles</span>
+        <span class="tag">Moyenne auto</span>
+        <span class="tag">Zones colorées</span>
+        <span class="tag">Tendance graphique</span>
+      </div>
+    </div>
+    <div class="metric-card">
+      <h3>🩸 Oxymétrie de pouls (SpO₂)</h3>
+      <p>Suivez votre saturation en oxygène mesure par mesure. Alertes visuelles si la valeur sort des limites normales (70–100%).</p>
+      <div class="metric-tags">
+        <span class="tag">Saisie rapide</span>
+        <span class="tag">Alerte hors limites</span>
+        <span class="tag">Historique complet</span>
+      </div>
+    </div>
+    <div class="metric-card">
+      <h3>💊 Prises de traitement</h3>
+      <p>Enregistrez vos prises d'Easyhaler au quotidien de 0 à 5. Identifiez les jours de forte utilisation dans votre historique.</p>
+      <div class="metric-tags">
+        <span class="tag">0–5 prises/jour</span>
+        <span class="tag">Easyhaler</span>
+        <span class="tag">Visible dans l'historique</span>
+      </div>
+    </div>
+    <div class="metric-card">
+      <h3>📝 Commentaires libres</h3>
+      <p>Notez les symptômes, le contexte ou la météo à chaque mesure. Jusqu'à 500 caractères pour un suivi précis.</p>
+      <div class="metric-tags">
+        <span class="tag">Symptômes</span>
+        <span class="tag">Contexte</span>
+        <span class="tag">Météo</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRIVACY -->
+<section class="privacy-strip">
+  <div class="privacy-strip-inner">
+    <div class="privacy-item"><span>✓</span><span>Données sur votre Google Drive uniquement</span></div>
+    <div class="privacy-item"><span>✓</span><span>Aucun serveur tiers, aucun tracking</span></div>
+    <div class="privacy-item"><span>✓</span><span>Fonctionne hors ligne après installation</span></div>
+    <div class="privacy-item"><span>✓</span><span>Sans pub, gratuit</span></div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta">
+  <h2>Prêt à reprendre le contrôle ?</h2>
+  <p>Gratuit. Sans compte. Fonctionne dans votre navigateur dès maintenant.</p>
+  <div class="cta-buttons">
+    <a href="app/app.html" class="btn-primary">🫁 Commencer le suivi</a>
+    <a href="app/app.html?demo=true" class="btn-ghost">Voir la démo d'abord</a>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">AsthmeTrack</div>
+  <div class="footer-links">
+    <a href="app/app.html?demo=true">Démo</a>
+    <a href="app/app.html">App</a>
+    <a href="https://github.com/StellaSecret/asthmetrack" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://stellasecret.github.io/privacy-pages/asthmetrack/privacy-en.html" target="_blank" rel="noopener">Privacy</a>
+  </div>
+  <p class="footer-copy">Open source · Tourne entièrement dans votre navigateur · Aucune donnée envoyée sans votre accord</p>
+</footer>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // Animate hero bars on load
+  document.querySelectorAll('.hv-bar').forEach(bar => {
+    const target = bar.style.width;
+    bar.style.width = '0';
+    setTimeout(() => { bar.style.width = target; }, 400);
+  });
+
+  // Theme toggle
+  const html = document.documentElement;
+  const btn = document.getElementById('themeToggle');
+  const saved = localStorage.getItem('at-theme') || 'dark';
+  html.setAttribute('data-theme', saved);
+  btn.textContent = saved === 'dark' ? '🌙' : '☀️';
+
+  btn.addEventListener('click', () => {
+    const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    btn.textContent = next === 'dark' ? '🌙' : '☀️';
+    localStorage.setItem('at-theme', next);
+  });
+});
+</script>
 </body>
 </html>
