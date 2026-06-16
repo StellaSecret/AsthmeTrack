@@ -39,14 +39,14 @@ npx cap open android  # opens Android Studio — build & run from there
 
 ## Configuration
 
-Before building, replace the Google OAuth Client ID placeholder in `www/index.html`:
+The application uses Google OAuth 2.0 to authenticate and sync data with your Google Drive.
 
-```js
-const GOOGLE_CLIENT_ID = '__GOOGLE_CLIENT_ID__';
-// → replace with your actual Web client ID from Google Cloud Console
-```
-
-Also add your Android client ID to `android/app/src/main/res/values/strings.xml` for the native OAuth flow.
+1. Create a Google Cloud Project.
+2. Enable the Google Drive API.
+3. Configure the OAuth consent screen.
+4. Obtain a Web Client ID and add it to your configuration (managed via environment variables in CI/CD, or by replacing the placeholder in `www/app/app.js` and `capacitor.config.json` for local builds).
+5. Ensure your Android package name (`com.stellasecret.asthmetrack`) and SHA-1/SHA-256 fingerprints (local, build server, and Play Store signing key) are registered in the Google Cloud Console for the Android application.
+6. Host a `/.well-known/assetlinks.json` file on your web domain (`https://stellasecret.github.io/.well-known/assetlinks.json`) containing your app's package name and SHA-256 fingerprint to enable Google Sign-In and App Links.
 
 ## Run tests
 
