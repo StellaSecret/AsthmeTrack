@@ -255,21 +255,22 @@
 <nav class="nav">
   <a class="nav-logo" href="index.html">AsthmeTrack</a>
   <div class="nav-links">
-    <a href="index.html" class="active">Accueil</a>
-    <a href="app/app.html?demo=true">Démo</a>
+    <a href="index.html" class="active" data-i18n="nav_home">Accueil</a>
+    <a href="app/app.html?demo=true" data-i18n="nav_demo">Démo</a>
     <a href="https://github.com/StellaSecret/asthmetrack" target="_blank" rel="noopener">GitHub</a>
-    <a href="https://stellasecret.github.io/privacy-pages/asthmetrack/privacy-en.html" target="_blank" rel="noopener">Privacy</a>
+    <a href="https://stellasecret.github.io/privacy-pages/asthmetrack/privacy-en.html" target="_blank" rel="noopener" data-i18n="nav_privacy">Privacy</a>
+    <button class="theme-toggle" id="langToggle" title="Basculer la langue" aria-label="Basculer français/anglais">🌐</button>
     <button class="theme-toggle" id="themeToggle" title="Basculer le thème" aria-label="Basculer mode clair/sombre">🌙</button>
-    <a href="app/app.html" class="nav-cta">Lancer l'app</a>
+    <a href="app/app.html" class="nav-cta" data-i18n="nav_app">Lancer l'app</a>
   </div>
 </nav>
 
 <!-- HERO -->
 <section class="hero">
   <div class="hero-content">
-    <p class="hero-eyebrow">Asthme &amp; santé respiratoire</p>
-    <h1 class="hero-title">Suivez ce qui <em>compte vraiment</em></h1>
-    <p class="hero-sub">
+    <p class="hero-eyebrow" data-i18n="hero_eyebrow">Asthme &amp; santé respiratoire</p>
+    <h1 class="hero-title" data-i18n="hero_title">Suivez ce qui <em>compte vraiment</em></h1>
+    <p class="hero-sub" data-i18n="hero_sub">
       DEP, SpO₂, prises de traitement — tout dans une même vue.
       Vos données restent les vôtres : sauvegardées sur votre Google Drive, jamais sur nos serveurs.
     </p>
@@ -281,27 +282,27 @@
 
   <!-- Mini DEP preview card -->
   <div class="hero-visual">
-    <div class="hv-label">Mesure du 15 juin — matin</div>
+    <div class="hv-label" data-i18n="hv_label">Mesure du 15 juin — matin</div>
 
     <div class="hv-metric-row">
       <span class="hv-metric-val">87%</span>
     </div>
-    <div class="hv-metric-label">de votre DEP théorique · Zone verte</div>
+    <div class="hv-metric-label" data-i18n="hv_metric_label">de votre DEP théorique · Zone verte</div>
 
     <div class="hv-bar-section">
-      <div class="hv-bar-header"><span>Souffle 1</span><span>430 L/min</span></div>
+      <div class="hv-bar-header"><span data-i18n="hv_blow1">Souffle 1</span><span class="hv-val">430 L/min</span></div>
       <div class="hv-bar-wrap"><div class="hv-bar" style="width:86%;background:var(--accent)"></div></div>
-      <div class="hv-bar-header"><span>Souffle 2</span><span>445 L/min</span></div>
+      <div class="hv-bar-header"><span data-i18n="hv_blow2">Souffle 2</span><span class="hv-val">445 L/min</span></div>
       <div class="hv-bar-wrap"><div class="hv-bar" style="width:89%;background:var(--green)"></div></div>
-      <div class="hv-bar-header"><span>Souffle 3</span><span>438 L/min</span></div>
+      <div class="hv-bar-header"><span data-i18n="hv_blow3">Souffle 3</span><span class="hv-val">438 L/min</span></div>
       <div class="hv-bar-wrap"><div class="hv-bar" style="width:87%;background:var(--accent)"></div></div>
     </div>
 
     <div class="hv-spo2-row">
-      <span class="hv-spo2-label">SpO₂</span>
+      <span class="hv-spo2-label" data-i18n="hv_spo2">SpO₂</span>
       <span class="hv-spo2-val">97%</span>
     </div>
-    <div class="hv-status">✓ Moyenne DEP : 438 L/min — stable depuis 7 jours</div>
+    <div class="hv-status" data-i18n="hv_status">✓ Moyenne DEP : 438 L/min — stable depuis 7 jours</div>
   </div>
 </section>
 
@@ -309,27 +310,27 @@
 
 <!-- HOW IT WORKS -->
 <section class="how">
-  <p class="section-eyebrow">Comment ça marche</p>
+  <p class="section-eyebrow" data-i18n="how_eyebrow">Comment ça marche</p>
   <div class="steps">
     <div class="step">
       <p class="step-num">01</p>
-      <h3>Saisissez vos mesures</h3>
-      <p>DEP en 3 souffles, SpO₂, et nombre de prises d'Easyhaler. La moyenne DEP est calculée automatiquement.</p>
+      <h3 data-i18n="step1_title">Saisissez vos mesures</h3>
+      <p data-i18n="step1_sub">DEP en 3 souffles, SpO₂, et nombre de prises d'Easyhaler. La moyenne DEP est calculée automatiquement.</p>
     </div>
     <div class="step">
       <p class="step-num">02</p>
-      <h3>Visualisez votre évolution</h3>
-      <p>Tableau de bord avec graphiques de tendances. Identifiez d'un coup d'œil les jours difficiles.</p>
+      <h3 data-i18n="step2_title">Visualisez votre évolution</h3>
+      <p data-i18n="step2_sub">Tableau de bord avec graphiques de tendances. Identifiez d'un coup d'œil les jours difficiles.</p>
     </div>
     <div class="step">
       <p class="step-num">03</p>
-      <h3>Comparez à votre DEP théorique</h3>
-      <p>Entrez votre profil (âge, sexe, taille). L'app calcule votre valeur de référence et affiche votre zone du jour.</p>
+      <h3 data-i18n="step3_title">Comparez à votre DEP théorique</h3>
+      <p data-i18n="step3_sub">Entrez votre profil (âge, sexe, taille). L'app calcule votre valeur de référence et affiche votre zone du jour.</p>
     </div>
     <div class="step">
       <p class="step-num">04</p>
-      <h3>Exportez en PDF</h3>
-      <p>Générez un rapport complet de votre historique pour le partager avec votre médecin.</p>
+      <h3 data-i18n="step4_title">Exportez en PDF</h3>
+      <p data-i18n="step4_sub">Générez un rapport complet de votre historique pour le partager avec votre médecin.</p>
     </div>
   </div>
 </section>
@@ -337,37 +338,37 @@
 <!-- FEATURES -->
 <section class="features">
   <div class="features-inner">
-    <p class="section-eyebrow">Ce qui rend AsthmeTrack différent</p>
+    <p class="section-eyebrow" data-i18n="feat_eyebrow">Ce qui rend AsthmeTrack différent</p>
     <div class="features-grid">
       <div class="feature">
         <div class="feature-icon">💨</div>
-        <h3>DEP sur 3 souffles</h3>
-        <p>Saisissez chaque souffle individuellement. La meilleure valeur et la moyenne sont calculées en temps réel.</p>
+        <h3 data-i18n="feat1_title">DEP sur 3 souffles</h3>
+        <p data-i18n="feat1_sub">Saisissez chaque souffle individuellement. La meilleure valeur et la moyenne sont calculées en temps réel.</p>
       </div>
       <div class="feature">
         <div class="feature-icon">🩺</div>
-        <h3>Zones de trafic colorées</h3>
-        <p>Vert, orange, rouge — selon votre DEP théorique. Un regard suffit pour évaluer votre état du jour.</p>
+        <h3 data-i18n="feat2_title">Zones de trafic colorées</h3>
+        <p data-i18n="feat2_sub">Vert, orange, rouge — selon votre DEP théorique. Un regard suffit pour évaluer votre état du jour.</p>
       </div>
       <div class="feature">
         <div class="feature-icon">☁️</div>
-        <h3>Google Drive personnel</h3>
-        <p>Vos données sont sauvegardées dans votre propre Drive. Ni serveur tiers, ni partage sans votre accord.</p>
+        <h3 data-i18n="feat3_title">Google Drive personnel</h3>
+        <p data-i18n="feat3_sub">Vos données sont sauvegardées dans votre propre Drive. Ni serveur tiers, ni partage sans votre accord.</p>
       </div>
       <div class="feature">
         <div class="feature-icon">📄</div>
-        <h3>Export PDF pour le médecin</h3>
-        <p>Rapport complet de l'historique, prêt à imprimer ou à envoyer lors de votre prochain rendez-vous.</p>
+        <h3 data-i18n="feat4_title">Export PDF pour le médecin</h3>
+        <p data-i18n="feat4_sub">Rapport complet de l'historique, prêt à imprimer ou à envoyer lors de votre prochain rendez-vous.</p>
       </div>
       <div class="feature">
         <div class="feature-icon">📴</div>
-        <h3>Fonctionne hors ligne</h3>
-        <p>Installez l'app une fois, utilisez-la sans connexion. La synchronisation se fait quand le réseau revient.</p>
+        <h3 data-i18n="feat5_title">Fonctionne hors ligne</h3>
+        <p data-i18n="feat5_sub">Installez l'app une fois, utilisez-la sans connexion. La synchronisation se fait quand le réseau revient.</p>
       </div>
       <div class="feature">
         <div class="feature-icon">🌗</div>
-        <h3>Mode sombre &amp; clair</h3>
-        <p>Interface adaptée à vos préférences. Thème sauvegardé automatiquement entre les sessions.</p>
+        <h3 data-i18n="feat6_title">Mode sombre &amp; clair</h3>
+        <p data-i18n="feat6_sub">Interface adaptée à vos préférences. Thème sauvegardé automatiquement entre les sessions.</p>
       </div>
     </div>
   </div>
@@ -375,11 +376,11 @@
 
 <!-- METRICS TRACKED -->
 <section class="metrics">
-  <p class="section-eyebrow">Mesures suivies</p>
+  <p class="section-eyebrow" data-i18n="metrics_eyebrow">Mesures suivies</p>
   <div class="metrics-grid">
     <div class="metric-card">
-      <h3>💨 Débit expiratoire de pointe (DEP)</h3>
-      <p>Mesurez votre DEP en 3 souffles consécutifs. Comparez au fil du temps avec votre valeur théorique calculée selon votre profil.</p>
+      <h3 data-i18n="m1_title">💨 Débit expiratoire de pointe (DEP)</h3>
+      <p data-i18n="m1_sub">Mesurez votre DEP en 3 souffles consécutifs. Comparez au fil du temps avec votre valeur théorique calculée selon votre profil.</p>
       <div class="metric-tags">
         <span class="tag">3 souffles</span>
         <span class="tag">Moyenne auto</span>
@@ -388,8 +389,8 @@
       </div>
     </div>
     <div class="metric-card">
-      <h3>🩸 Oxymétrie de pouls (SpO₂)</h3>
-      <p>Suivez votre saturation en oxygène mesure par mesure. Alertes visuelles si la valeur sort des limites normales (70–100%).</p>
+      <h3 data-i18n="m2_title">🩸 Oxymétrie de pouls (SpO₂)</h3>
+      <p data-i18n="m2_sub">Suivez votre saturation en oxygène mesure par mesure. Alertes visuelles si la valeur sort des limites normales (70–100%).</p>
       <div class="metric-tags">
         <span class="tag">Saisie rapide</span>
         <span class="tag">Alerte hors limites</span>
@@ -397,8 +398,8 @@
       </div>
     </div>
     <div class="metric-card">
-      <h3>💊 Prises de traitement</h3>
-      <p>Enregistrez vos prises d'Easyhaler au quotidien de 0 à 5. Identifiez les jours de forte utilisation dans votre historique.</p>
+      <h3 data-i18n="m3_title">💊 Prises de traitement</h3>
+      <p data-i18n="m3_sub">Enregistrez vos prises d'Easyhaler au quotidien de 0 à 5. Identifiez les jours de forte utilisation dans votre historique.</p>
       <div class="metric-tags">
         <span class="tag">0–5 prises/jour</span>
         <span class="tag">Easyhaler</span>
@@ -406,8 +407,8 @@
       </div>
     </div>
     <div class="metric-card">
-      <h3>📝 Commentaires libres</h3>
-      <p>Notez les symptômes, le contexte ou la météo à chaque mesure. Jusqu'à 500 caractères pour un suivi précis.</p>
+      <h3 data-i18n="m4_title">📝 Commentaires libres</h3>
+      <p data-i18n="m4_sub">Notez les symptômes, le contexte ou la météo à chaque mesure. Jusqu'à 500 caractères pour un suivi précis.</p>
       <div class="metric-tags">
         <span class="tag">Symptômes</span>
         <span class="tag">Contexte</span>
@@ -420,20 +421,20 @@
 <!-- PRIVACY -->
 <section class="privacy-strip">
   <div class="privacy-strip-inner">
-    <div class="privacy-item"><span>✓</span><span>Données sur votre Google Drive uniquement</span></div>
-    <div class="privacy-item"><span>✓</span><span>Aucun serveur tiers, aucun tracking</span></div>
-    <div class="privacy-item"><span>✓</span><span>Fonctionne hors ligne après installation</span></div>
-    <div class="privacy-item"><span>✓</span><span>Sans pub, gratuit</span></div>
+    <div class="privacy-item"><span data-i18n="p1">✓</span><span data-i18n="p1_txt">Données sur votre Google Drive uniquement</span></div>
+    <div class="privacy-item"><span data-i18n="p2">✓</span><span data-i18n="p2_txt">Aucun serveur tiers, aucun tracking</span></div>
+    <div class="privacy-item"><span data-i18n="p3">✓</span><span data-i18n="p3_txt">Fonctionne hors ligne après installation</span></div>
+    <div class="privacy-item"><span data-i18n="p4">✓</span><span data-i18n="p4_txt">Sans pub, gratuit</span></div>
   </div>
 </section>
 
-<!-- CTA -->
+<!-- CTA SECTION -->
 <section class="cta">
-  <h2>Prêt à reprendre le contrôle ?</h2>
-  <p>Gratuit. Sans compte. Fonctionne dans votre navigateur dès maintenant.</p>
+  <h2 data-i18n="cta_title">Prêt à reprendre le contrôle ?</h2>
+  <p data-i18n="cta_sub">Gratuit. Sans compte. Fonctionne dans votre navigateur dès maintenant.</p>
   <div class="cta-buttons">
-    <a href="app/app.html" class="btn-primary">🫁 Commencer le suivi</a>
-    <a href="app/app.html?demo=true" class="btn-ghost">Voir la démo d'abord</a>
+    <a href="app/app.html" class="btn-primary" data-i18n="nav_app">🫁 Commencer le suivi</a>
+    <a href="app/app.html?demo=true" class="btn-ghost" data-i18n="nav_demo">Voir la démo d'abord</a>
   </div>
 </section>
 
@@ -441,16 +442,95 @@
 <footer>
   <div class="footer-logo">AsthmeTrack</div>
   <div class="footer-links">
-    <a href="app/app.html?demo=true">Démo</a>
-    <a href="app/app.html">App</a>
+    <a href="app/app.html?demo=true" data-i18n="nav_demo">Démo</a>
+    <a href="app/app.html" data-i18n="nav_app">App</a>
     <a href="https://github.com/StellaSecret/asthmetrack" target="_blank" rel="noopener">GitHub</a>
-    <a href="https://stellasecret.github.io/privacy-pages/asthmetrack/privacy-en.html" target="_blank" rel="noopener">Privacy</a>
+    <a href="https://stellasecret.github.io/privacy-pages/asthmetrack/privacy-en.html" target="_blank" rel="noopener" data-i18n="nav_privacy">Privacy</a>
   </div>
-  <p class="footer-copy">Open source · Tourne entièrement dans votre navigateur · Aucune donnée envoyée sans votre accord</p>
+  <p class="footer-copy" data-i18n="footer_copy">Open source · Tourne entièrement dans votre navigateur · Aucune donnée envoyée sans votre accord</p>
 </footer>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+  // Translations
+  const t = {
+    fr: {
+      nav_home: "Accueil", nav_demo: "Démo", nav_privacy: "Privacy", nav_app: "Lancer l'app",
+      hero_eyebrow: "Asthme & santé respiratoire",
+      hero_title: "Suivez ce qui <em>compte vraiment</em>",
+      hero_sub: "DEP, SpO₂, prises de traitement — tout dans une même vue. Vos données restent les vôtres : sauvegardées sur votre Google Drive, jamais sur nos serveurs.",
+      how_eyebrow: "Comment ça marche",
+      step1_title: "Saisissez vos mesures", step1_sub: "DEP en 3 souffles, SpO₂, et nombre de prises d'Easyhaler. La moyenne DEP est calculée automatiquement.",
+      step2_title: "Visualisez votre évolution", step2_sub: "Tableau de bord avec graphiques de tendances. Identifiez d'un coup d'œil les jours difficiles.",
+      step3_title: "Comparez à votre DEP théorique", step3_sub: "Entrez votre profil (âge, sexe, taille). L'app calcule votre valeur de référence et affiche votre zone du jour.",
+      step4_title: "Exportez en PDF", step4_sub: "Générez un rapport complet de votre historique pour le partager avec votre médecin.",
+      feat_eyebrow: "Ce qui rend AsthmeTrack différent",
+      feat1_title: "DEP sur 3 souffles", feat1_sub: "Saisissez chaque souffle individuellement. La meilleure valeur et la moyenne sont calculées en temps réel.",
+      feat2_title: "Zones de trafic colorées", feat2_sub: "Vert, orange, rouge — selon votre DEP théorique. Un regard suffit pour évaluer votre état du jour.",
+      feat3_title: "Google Drive personnel", feat3_sub: "Vos données sont sauvegardées dans votre propre Drive. Ni serveur tiers, ni partage sans votre accord.",
+      feat4_title: "Export PDF pour le médecin", feat4_sub: "Rapport complet de l'historique, prêt à imprimer ou à envoyer lors de votre prochain rendez-vous.",
+      feat5_title: "Fonctionne hors ligne", feat5_sub: "Installez l'app une fois, utilisez-la sans connexion. La synchronisation se fait quand le réseau revient.",
+      feat6_title: "Mode sombre & clair", feat6_sub: "Interface adaptée à vos préférences. Thème sauvegardé automatiquement entre les sessions.",
+      metrics_eyebrow: "Mesures suivies",
+      m1_title: "💨 Débit expiratoire de pointe (DEP)", m1_sub: "Mesurez votre DEP en 3 souffles consécutifs. Comparez au fil du temps avec votre valeur théorique calculée selon votre profil.",
+      m2_title: "🩸 Oxymétrie de pouls (SpO₂)", m2_sub: "Suivez votre saturation en oxygène mesure par mesure. Alertes visuelles si la valeur sort des limites normales (70–100%).",
+      m3_title: "💊 Prises de traitement", m3_sub: "Enregistrez vos prises d'Easyhaler au quotidien de 0 à 5. Identifiez les jours de forte utilisation dans votre historique.",
+      m4_title: "📝 Commentaires libres", m4_sub: "Notez les symptômes, le contexte ou la météo à chaque mesure. Jusqu'à 500 caractères pour un suivi précis.",
+      cta_title: "Prêt à reprendre le contrôle ?", cta_sub: "Gratuit. Sans compte. Fonctionne dans votre navigateur dès maintenant.",
+      footer_copy: "Open source · Tourne entièrement dans votre navigateur · Aucune donnée envoyée sans votre accord",
+      p1_txt: "Données sur votre Google Drive uniquement", p2_txt: "Aucun serveur tiers, aucun tracking", p3_txt: "Fonctionne hors ligne après installation", p4_txt: "Sans pub, gratuit",
+      hv_label: "Mesure du 15 juin — matin", hv_metric_label: "de votre DEP théorique · Zone verte",
+      hv_blow1: "Souffle 1", hv_blow2: "Souffle 2", hv_blow3: "Souffle 3",
+      hv_spo2: "SpO₂", hv_status: "✓ Moyenne DEP : 438 L/min — stable depuis 7 jours"
+    },
+    en: {
+      nav_home: "Home", nav_demo: "Demo", nav_privacy: "Privacy", nav_app: "Launch App",
+      hero_eyebrow: "Asthma & respiratory health",
+      hero_title: "Track what <em>really matters</em>",
+      hero_sub: "PEF, SpO₂, treatment doses — all in one view. Your data stays yours: saved to your Google Drive, never on our servers.",
+      how_eyebrow: "How it works",
+      step1_title: "Enter your measurements", step1_sub: "PEF in 3 blows, SpO₂, and Easyhaler doses. PEF average is calculated automatically.",
+      step2_title: "Visualize your progress", step2_sub: "Dashboard with trend charts. Identify difficult days at a glance.",
+      step3_title: "Compare to predicted PEF", step3_sub: "Enter your profile (age, sex, height). The app calculates your reference value and shows your daily zone.",
+      step4_title: "Export to PDF", step4_sub: "Generate a complete history report to share with your doctor.",
+      feat_eyebrow: "What makes AsthmeTrack different",
+      feat1_title: "PEF on 3 blows", feat1_sub: "Enter each blow individually. The best value and average are calculated in real-time.",
+      feat2_title: "Color-coded zones", feat2_sub: "Green, yellow, red — based on your predicted PEF. A quick glance evaluates your daily status.",
+      feat3_title: "Personal Google Drive", feat3_sub: "Your data is saved to your own Drive. No third-party servers, no sharing without your consent.",
+      feat4_title: "PDF report for doctor", feat4_sub: "Complete history report, ready to print or email for your next appointment.",
+      feat5_title: "Works offline", feat5_sub: "Install the app once, use it without connection. Sync happens when the network returns.",
+      feat6_title: "Dark & light mode", feat6_sub: "Interface adapts to your preferences. Theme is saved automatically between sessions.",
+      metrics_eyebrow: "Metrics tracked",
+      m1_title: "💨 Peak Expiratory Flow (PEF)", m1_sub: "Measure your PEF in 3 consecutive blows. Compare over time with your theoretical value calculated based on your profile.",
+      m2_title: "🩸 Pulse Oximetry (SpO₂)", m2_sub: "Track your oxygen saturation measurement by measurement. Visual alerts if the value falls outside normal limits (70–100%).",
+      m3_title: "💊 Treatment doses", m3_sub: "Log your daily Easyhaler doses from 0 to 5. Identify high-usage days in your history.",
+      m4_title: "📝 Free-form comments", m4_sub: "Note symptoms, context, or weather for each measure. Up to 500 characters for precise tracking.",
+      cta_title: "Ready to take control?", cta_sub: "Free. No account required. Works in your browser right now.",
+      footer_copy: "Open source · Runs entirely in your browser · No data sent without your consent",
+      p1_txt: "Data only on your Google Drive", p2_txt: "No third-party servers, no tracking", p3_txt: "Works offline after installation", p4_txt: "No ads, free",
+      hv_label: "Measurement of June 15 — morning", hv_metric_label: "of your predicted PEF · Green zone",
+      hv_blow1: "Blow 1", hv_blow2: "Blow 2", hv_blow3: "Blow 3",
+      hv_spo2: "SpO₂", hv_status: "✓ Avg PEF: 438 L/min — stable for 7 days"
+    }
+  };
+
+  function setLang(lang) {
+    document.documentElement.lang = lang;
+    localStorage.setItem('at-lang', lang);
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      const key = el.getAttribute('data-i18n');
+      if (t[lang][key]) el.innerHTML = t[lang][key];
+    });
+    document.getElementById('langToggle').textContent = lang === 'fr' ? '🇫🇷' : '🇬🇧';
+  }
+
+  // Language toggle
+  const savedLang = localStorage.getItem('at-lang') || 'fr';
+  setLang(savedLang);
+  document.getElementById('langToggle').addEventListener('click', () => {
+    setLang(document.documentElement.lang === 'fr' ? 'en' : 'fr');
+  });
+
   // Animate hero bars on load
   document.querySelectorAll('.hv-bar').forEach(bar => {
     const target = bar.style.width;
