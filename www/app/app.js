@@ -1236,7 +1236,7 @@ async function _doExportPDF(measures){
     if(y>282){doc.addPage();doc.setFillColor(...dark);doc.rect(0,0,210,297,'F');y=15;}
     const d=new Date(m.dt);
     const souffles=[m.dep1,m.dep2,m.dep3].filter(Boolean).join('/');
-    const dz=depZone(m.dep);const zc=dz==='green'?[16,217,160]:dz==='yellow'?[245,166,35]:[240,79,79];
+    const dz=depZone(m.dep);const zc=dz==='green'?[16,217,160]:dz==='yellow'?[251,191,36]:[240,79,79];
     const row=[
       d.toLocaleDateString('fr-FR'),
       d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}),
@@ -1253,7 +1253,7 @@ async function _doExportPDF(measures){
     x=10;
     row.forEach((cell,i)=>{
       if(i===4){doc.setTextColor(...zc);}
-      else if(i===6&&m.spo2){const sz=spo2Zone(m.spo2);doc.setTextColor(...(sz==='green'?[16,217,160]:sz==='yellow'?[245,166,35]:[240,79,79]));}
+      else if(i===6&&m.spo2){const sz=spo2Zone(m.spo2);doc.setTextColor(...(sz==='green'?[16,217,160]:sz==='yellow'?[251,191,36]:[240,79,79]));}
       else{doc.setTextColor(...muted);}
       doc.text(String(cell||''),x,y,{maxWidth:widths[i]-2});
       x+=widths[i];

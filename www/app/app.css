@@ -8,11 +8,11 @@
     --accent: #4f9cf9;
     --accent2: #7c3aed;
     --green: #10d9a0;
-    --yellow: #f5a623;
+    --yellow: #fbbf24;
     --red: #f04f4f;
     --danger: #f04f4f;
     --green-dim: rgba(16,217,160,0.12);
-    --yellow-dim: rgba(245,166,35,0.12);
+    --yellow-dim: rgba(251,191,36,0.12);
     --red-dim: rgba(240,79,79,0.12);
     --radius: 14px;
     --font-head: 'Outfit', sans-serif;
@@ -31,11 +31,11 @@
     --accent: #1d5fba;      /* slightly deeper blue, good contrast on warm bg */
     --accent2: #6d28d9;
     --green: #0f7a5a;       /* deeper green for contrast on warm bg */
-    --yellow: #b45309;
+    --yellow: #d97706;
     --red: #b91c1c;
     --danger: #b91c1c;
     --green-dim: rgba(15,122,90,0.10);
-    --yellow-dim: rgba(180,83,9,0.10);
+    --yellow-dim: rgba(217,119,6,0.10);
     --red-dim: rgba(185,28,28,0.10);
   }
   html[data-theme="light"] body { background: var(--bg); }
