@@ -31,7 +31,7 @@
     "@capacitor/filesystem": "^8.1.2",
     "@capacitor/local-notifications": "^8.2.0",
     "@capacitor/share": "^8.0.1",
-    "@capgo/capacitor-social-login": "^8.3.22",
+    "@capgo/capacitor-social-login": "^8.3.30",
     "jspdf": "^4.2.1"
   },
   "devDependencies": {
