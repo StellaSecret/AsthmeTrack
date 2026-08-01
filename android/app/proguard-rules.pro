@@ -19,3 +19,9 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# capgo/capacitor-social-login checks availability of these Google Play
+# Services classes via Class.forName — R8 full mode would strip/rename them.
+-keep class com.google.android.gms.auth.api.identity.** { *; }
+-keep class com.google.android.gms.common.api.ApiException { *; }
+-keep class com.google.android.libraries.identity.googleid.** { *; }
