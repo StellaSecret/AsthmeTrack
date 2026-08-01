@@ -215,6 +215,7 @@ const LANG = {
     btn_drive_upload: '⬆ Sauvegarder',
     btn_drive_download: '⬇ Restaurer',
     btn_drive_disconnect: 'Déconnecter',
+    btn_drive_browse: '🔎 Inspecter ma sauvegarde',
     btn_google_signin: 'Se connecter avec Google',
     settings_dep_title: 'Calibration DEP',
     settings_dep_label: 'Votre meilleur DEP personnel (L/min)',
@@ -375,6 +376,7 @@ const LANG = {
     btn_drive_upload: '⬆ Save',
     btn_drive_download: '⬇ Restore',
     btn_drive_disconnect: 'Disconnect',
+    btn_drive_browse: '🔎 Inspect my backup',
     btn_google_signin: 'Sign in with Google',
     settings_dep_title: 'PEF Calibration',
     settings_dep_label: 'Your personal best PEF (L/min)',
@@ -1834,6 +1836,7 @@ function renderSettings(){
           <button class="drive-btn upload" data-action="driveSyncUp">${t('btn_drive_upload')}</button>
           <button class="drive-btn download" data-action="driveSyncDown">${t('btn_drive_download')}</button>
           <button class="drive-btn danger" data-action="disconnectDrive">${t('btn_drive_disconnect')}</button>
+          <a class="drive-btn" href="https://stellasecret.github.io/gdrive-appdata-browser/" target="_blank" rel="noopener">${t('btn_drive_browse')}</a>
         </div>
       `:`
         <p style="font-size:14px;color:var(--muted);margin-bottom:16px">${t('settings_drive_desc')}</p>
