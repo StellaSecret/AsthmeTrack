@@ -116,9 +116,11 @@ jobs:
 
   build-android:
     name: Build Android
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
     needs: [scan-secrets, codeql-analysis, npm-security, playwright-tests]
     runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event_name == 'pull_request' && 'build-review' || 'build' }}
     outputs:
       artifact-name: artifacts-${{ github.run_number }}
     steps:
