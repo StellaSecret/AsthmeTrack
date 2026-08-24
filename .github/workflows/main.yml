@@ -123,6 +123,14 @@ jobs:
       name: ${{ github.event_name == 'pull_request' && 'build-review' || 'build' }}
     outputs:
       artifact-name: artifacts-${{ github.run_number }}
+    env:
+      # GitHub Actions does not expose repository secrets to workflow runs triggered
+      # by Dependabot or by pull requests from forks. Trying to sign with an empty
+      # KEYSTORE_BASE64 produces a 0-byte "keystore" and Gradle fails with a
+      # confusing "Tag number over 30 is not supported" error. So on those runs we
+      # skip signing entirely and build an unsigned debug APK/AAB just to confirm
+      # the app still compiles.
+      HAS_SIGNING_SECRETS: ${{ github.actor != 'dependabot[bot]' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -139,9 +147,13 @@ jobs:
           sed -i "s|__GOOGLE_CLIENT_ID__|${{ secrets.GOOGLE_CLIENT_ID }}|g" www/app/app.js
           sed -i "s|__GOOGLE_CLIENT_ID__|${{ secrets.GOOGLE_CLIENT_ID }}|g" capacitor.config.json
           npx cap sync android
+
       - name: Decode keystore
+        if: env.HAS_SIGNING_SECRETS == 'true'
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/asthmetrack-release.jks
-      - name: Build Bundle & APK
+
+      - name: Build signed Bundle & APK (release)
+        if: env.HAS_SIGNING_SECRETS == 'true'
         run: |
           cd android
           chmod +x gradlew
@@ -152,15 +164,34 @@ jobs:
             -Pandroid.injected.signing.store.password="${{ secrets.KEYSTORE_PASSWORD }}" \
             -Pandroid.injected.signing.key.alias="${{ secrets.KEY_ALIAS }}" \
             -Pandroid.injected.signing.key.password="${{ secrets.KEY_PASSWORD }}" --no-daemon
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-      - name: Upload artifacts
+
+      - name: Build unsigned Bundle & APK (no repo secrets on this run)
+        if: env.HAS_SIGNING_SECRETS != 'true'
+        run: |
+          cd android
+          chmod +x gradlew
+          VCODE=$((28 + ${{ github.run_number }}))
+          sed -i "s/versionCode .*/versionCode $VCODE/" app/build.gradle
+          ./gradlew bundleDebug assembleDebug --no-daemon
+
+      - name: Upload artifacts (signed release)
+        if: env.HAS_SIGNING_SECRETS == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: artifacts-${{ github.run_number }}
           path: |
             android/app/build/outputs/bundle/release/app-release.aab
             android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 7
+
+      - name: Upload artifacts (unsigned debug — build validation only)
+        if: env.HAS_SIGNING_SECRETS != 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: artifacts-${{ github.run_number }}
+          path: |
+            android/app/build/outputs/bundle/debug/app-debug.aab
+            android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 7
 
   release:
