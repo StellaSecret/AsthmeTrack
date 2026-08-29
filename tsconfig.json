@@ -6,8 +6,7 @@
     "strict": true,
     "esModuleInterop": true,
     "resolveJsonModule": true,
-    "outDir": "./dist",
-    "baseUrl": "."
+    "outDir": "./dist"
   },
   "include": ["tests/**/*.ts", "playwright.config.ts"]
 }

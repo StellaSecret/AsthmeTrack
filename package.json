@@ -8,6 +8,8 @@
     "test:ui": "playwright test --ui",
     "test:headed": "playwright test --headed",
     "test:report": "playwright show-report",
+    "test:unit": "vitest run",
+    "test:mutation": "stryker run",
     "serve:test": "node server.js",
     "format:trim": "node scripts/trim-spaces.js",
     "typecheck": "tsc --noEmit"
@@ -41,7 +43,10 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",
+    "@stryker-mutator/core": "^10.0.0",
+    "@stryker-mutator/vitest-runner": "^10.0.0",
     "husky": "^9.0.0",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
   }
 }

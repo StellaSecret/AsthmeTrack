@@ -32,3 +32,10 @@ Thumbs.db
 playwright-report/
 test-results/
 *.zip
+
+# ── Mutation testing ──────────────────────
+reports/
+stryker-tmp/
+.stryker-tmp/
+stryker-setup-*.js
+work-*/
