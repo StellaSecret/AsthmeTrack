@@ -11,6 +11,9 @@ const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/drive.appdata https://www
 const GDRIVE_FILENAME = 'asthmetrack_data.json';
 const IS_CAPACITOR = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 
+// Pure business logic (loaded from logic.js). DOM-free, unit-tested, mutation-tested.
+const { depZone, spo2Zone, predictedDEP, calcTrend, isCrisis } = window.AsthmeTrackLogic;
+
 
 // ══════════════════════════════════════════
 //  HTML ESCAPE HELPER  (FIX #1–3, #7–8 — XSS)
@@ -555,8 +558,6 @@ applyFont(isCustomFont());
 // ══════════════════════════════════════════
 //  ZONES
 // ══════════════════════════════════════════
-function depZone(dep){const p=(dep/DB.bestDEP)*100;return p>=80?'green':p>=60?'yellow':'red';}
-function spo2Zone(s){return s>=95?'green':s>=90?'yellow':'red';}
 function zoneLabel(z){return{green:t('zone_green'),yellow:t('zone_yellow'),red:t('zone_red')}[z];}
 function zoneClass(z){return'zone-'+z;}
 
@@ -651,14 +652,6 @@ function renderStaticHTML() {
 //  Female: PEF = (((height_m * 3.72) + 2.24) - (age * 0.030)) × 60
 //  Normal range ±20% around predicted value.
 // ══════════════════════════════════════════
-function predictedDEP(sex, age, heightCm) {
-  const h = heightCm / 100;
-  let pef;
-  if (sex === 'M') pef = (((h * 5.48) + 1.58) - (age * 0.041)) * 60;
-  else             pef = (((h * 3.72) + 2.24) - (age * 0.030)) * 60;
-  return Math.round(pef);
-}
-
 function openProfileModal() {
   const p = DB.profile;
   document.getElementById('profileSex').value    = p.sex    || 'M';
@@ -720,21 +713,7 @@ function useProfileDEP(val) {
 
 // ══════════════════════════════════════════
 //  TREND  (compare last 7 days vs previous 7 days)
-// ══════════════════════════════════════════
-function calcTrend(measures, field) {
-  const now   = Date.now();
-  const day3  = 3 * 24 * 3600 * 1000;
-  const day6  = 6 * 24 * 3600 * 1000;
-  const last3 = measures.filter(m => (now - new Date(m.dt)) < day3);
-  const prev3 = measures.filter(m => { const age = now - new Date(m.dt); return age >= day3 && age < day6; });
-  if (!last3.length || !prev3.length) return null;
-  const avg = arr => arr.reduce((s,m) => s + m[field], 0) / arr.length;
-  const diff = avg(last3) - avg(prev3);
-  const pct  = Math.abs(diff) / avg(prev3) * 100;
-  if (pct < 3) return 'flat';
-  return diff > 0 ? 'up' : 'down';
-}
-
+//  ── calcTrend lives in logic.js ──
 function trendArrow(trend, field) {
   if (!trend) return '';
   const isGoodUp = field === 'dep' || field === 'spo2'; // higher = better for both
@@ -747,13 +726,8 @@ function trendArrow(trend, field) {
 // ══════════════════════════════════════════
 //  CRISIS DETECTION
 //  Fires when last N consecutive readings are red-zone DEP
+//  ── isCrisis + CRISIS_THRESHOLD live in logic.js ──
 // ══════════════════════════════════════════
-const CRISIS_THRESHOLD = 2; // consecutive red-zone readings to trigger banner
-
-function isCrisis(measures) {
-  if (measures.length < CRISIS_THRESHOLD) return false;
-  return measures.slice(0, CRISIS_THRESHOLD).every(m => depZone(m.dep) === 'red');
-}
 
 // ══════════════════════════════════════════
 //  CSV EXPORT
@@ -771,7 +745,7 @@ async function exportCSV() {
       const blows = [m.dep1, m.dep2, m.dep3].filter(Boolean).join(' / ');
       return [
         date, time, m.dep, blows,
-        zoneLabel(depZone(m.dep)).replace(/🟢|🟡|🔴/g, '').trim(),
+        zoneLabel(depZone(m.dep, DB.bestDEP)).replace(/🟢|🟡|🔴/g, '').trim(),
         m.spo2,
         zoneLabel(spo2Zone(m.spo2)).replace(/🟢|🟡|🔴/g, '').trim(),
         m.easy != null ? m.easy : '',
@@ -1007,7 +981,7 @@ function renderDashboard(){
   if(!measures.length){
     cont.innerHTML=`<div class="empty-state"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg><p>${t('db_no_data')}</p></div>`;return;
   }
-  const last=measures[0],dz=depZone(last.dep),sz=spo2Zone(last.spo2),depPct=Math.round((last.dep/DB.bestDEP)*100);
+  const last=measures[0],dz=depZone(last.dep,DB.bestDEP),sz=spo2Zone(last.spo2),depPct=Math.round((last.dep/DB.bestDEP)*100);
   const depDetail=[last.dep1,last.dep2,last.dep3].filter(Boolean);
   // Tri par date croissante pour les graphes (14 derniers jours chronologiques)
   const recent=[...measures].sort((a,b)=>new Date(a.dt)-new Date(b.dt)).slice(-14);
@@ -1015,7 +989,7 @@ function renderDashboard(){
   const activeRem=DB.reminders.filter(r=>r.active);
   const depTrend  = calcTrend(measures, 'dep');
   const spo2Trend = calcTrend(measures, 'spo2');
-  const crisis    = isCrisis(measures);
+  const crisis    = isCrisis(measures, DB.bestDEP);
 
   // Crisis banner — static i18n text only, safe innerHTML
   if(crisis){
@@ -1138,7 +1112,7 @@ const HISTORY_PAGE_SIZE = 30;
 let _historyShown = HISTORY_PAGE_SIZE;
 
 function _buildHistoryItem(m) {
-  const dz=depZone(m.dep),sz=spo2Zone(m.spo2),d=new Date(m.dt);
+  const dz=depZone(m.dep,DB.bestDEP),sz=spo2Zone(m.spo2),d=new Date(m.dt);
   const dateStr=d.toLocaleDateString(t('locale'),{weekday:'short',day:'2-digit',month:'short'})+' '+d.toLocaleTimeString(t('locale'),{hour:'2-digit',minute:'2-digit'});
   const depDetail=[m.dep1,m.dep2,m.dep3].filter(Boolean);
 
@@ -1238,7 +1212,7 @@ async function _doExportPDF(measures){
     if(y>282){doc.addPage();doc.setFillColor(...dark);doc.rect(0,0,210,297,'F');y=15;}
     const d=new Date(m.dt);
     const souffles=[m.dep1,m.dep2,m.dep3].filter(Boolean).join('/');
-    const dz=depZone(m.dep);const zc=dz==='green'?[16,217,160]:dz==='yellow'?[251,191,36]:[240,79,79];
+    const dz=depZone(m.dep,DB.bestDEP);const zc=dz==='green'?[16,217,160]:dz==='yellow'?[251,191,36]:[240,79,79];
     const row=[
       d.toLocaleDateString('fr-FR'),
       d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}),

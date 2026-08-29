@@ -89,6 +89,130 @@ jobs:
           path: playwright-report/
           retention-days: 30
 
+  # ── PARALLEL MUTATION TEST JOB ────────────────────────
+  mutation-tests:
+    name: Mutation Tests (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: logic-core
+            files: www/app/logic.js
+            exclude_lines: '7,8,9,10,11,12,13,46'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: "Run mutation tests (${{ matrix.name }})"
+        id: mutants
+        run: |
+          set -o pipefail
+          i=0
+          fatal=0
+          TIMEOUT="${{ matrix.timeout }}"
+          if [ -z "$TIMEOUT" ]; then
+            TIMEOUT=300
+          fi
+          for f in ${{ matrix.files }}; do
+            echo "::group::$f"
+            EXCLUDE_LINES="${{ matrix.exclude_lines }}"
+            timeout "$TIMEOUT" npx stryker run --mutate "$f" --reporters json,progress,html && ec=0 || ec=$?
+            if [ "$ec" -ne 0 ]; then
+              echo "WARN: stryker exited $ec on $f (report may still be valid)"
+            fi
+            parse_args=(reports/mutation/mutation.json "work-$i/mutants.out")
+            if [ -n "$EXCLUDE_LINES" ]; then
+              parse_args+=(--exclude-lines "$EXCLUDE_LINES")
+            fi
+            node scripts/mutants-txt.mjs "${parse_args[@]}" && p=0 || p=$?
+            rm -rf reports/mutation
+            echo "::endgroup::"
+            if [ "$p" -ne 0 ]; then
+              echo "FATAL: mutants-txt exited $p on $f"
+              fatal=$p
+            else
+              echo "mutants-txt exited $p on $f"
+            fi
+            i=$((i + 1))
+          done
+          mkdir -p mutants.out
+          for d in work-*/mutants.out; do
+            [ -f "$d/caught.txt" ] && cat "$d/caught.txt" >> mutants.out/caught.txt
+            [ -f "$d/missed.txt" ] && cat "$d/missed.txt" >> mutants.out/missed.txt
+            [ -f "$d/unviable.txt" ] && cat "$d/unviable.txt" >> mutants.out/unviable.txt
+          done
+          echo "Merged $(wc -l < mutants.out/caught.txt 2>/dev/null || echo 0) caught, $(wc -l < mutants.out/missed.txt 2>/dev/null || echo 0) missed, $(wc -l < mutants.out/unviable.txt 2>/dev/null || echo 0) unviable"
+          echo "fatal=$fatal" >> $GITHUB_OUTPUT
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: mutants-${{ matrix.name }}
+          path: mutants.out
+          retention-days: 30
+      - name: "Fail if mutations missed"
+        if: steps.mutants.outputs.fatal != '0'
+        run: |
+          echo "mutation testing found missed/timeout mutants — exiting"
+          exit ${{ steps.mutants.outputs.fatal }}
+
+  mutation-summary:
+    name: Mutation Tests Summary
+    if: always()
+    needs: [mutation-tests]
+    runs-on: ubuntu-latest
+    outputs:
+      total_missed: ${{ steps.report.outputs.total_missed }}
+    steps:
+      - name: Download all mutant artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: mutants-*
+          path: mutants/
+          merge-multiple: false
+      - name: Report results
+        id: report
+        run: |
+          echo "## Mutation Testing Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Shard | Caught | Missed | Unviable |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|---|---|" >> $GITHUB_STEP_SUMMARY
+          total_caught=0
+          total_missed=0
+          total_unviable=0
+          # A pattern matching a single artifact extracts directly into `path`,
+          # while multiple matched artifacts get subdirectories named after the
+          # artifact. Handle both layouts.
+          while IFS= read -r caught_file; do
+            dir=$(dirname "$caught_file")
+            name=$(basename "$dir")
+            if [ "$name" = "mutants" ]; then
+              name="all"
+            elif [[ "$name" == mutants-* ]]; then
+              name="${name#mutants-}"
+            fi
+            caught=$(wc -l < "$caught_file")
+            missed=0; unviable=0
+            [ -f "$dir/missed.txt" ] && missed=$(wc -l < "$dir/missed.txt")
+            [ -f "$dir/unviable.txt" ] && unviable=$(wc -l < "$dir/unviable.txt")
+            total_caught=$((total_caught + caught))
+            total_missed=$((total_missed + missed))
+            total_unviable=$((total_unviable + unviable))
+            if [ "$missed" -gt 0 ]; then
+              echo "| $name | $caught | **$missed** | $unviable |" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "| $name | $caught | $missed | $unviable |" >> $GITHUB_STEP_SUMMARY
+            fi
+          done < <(find mutants -name caught.txt 2>/dev/null | sort) || true
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Total: $total_caught caught / $total_missed missed / $total_unviable unviable**" >> $GITHUB_STEP_SUMMARY
+          echo "total_missed=$total_missed" >> $GITHUB_OUTPUT
+
   # ── SEQUENTIAL DEPLOYMENT JOBS ───────────────────────
   deploy-pages:
     name: Deploy to GitHub Pages
@@ -117,7 +241,7 @@ jobs:
   build-android:
     name: Build Android
     if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
-    needs: [scan-secrets, codeql-analysis, npm-security, playwright-tests]
+    needs: [scan-secrets, codeql-analysis, npm-security, playwright-tests, mutation-tests]
     runs-on: ubuntu-latest
     environment:
       name: ${{ github.event_name == 'pull_request' && 'build-review' || 'build' }}
