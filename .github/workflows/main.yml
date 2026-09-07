@@ -52,7 +52,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24.11.0
           cache: npm
       - name: Install & Audit
         run: |
@@ -74,7 +74,7 @@ jobs:
         shardTotal: [2]
     runs-on: ubuntu-latest
     container:
-      image: mcr.microsoft.com/playwright:v1.62.1-noble
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
     steps:
       - uses: actions/checkout@v7
       - name: Install dependencies
@@ -104,7 +104,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24.11.0
           cache: npm
           cache-dependency-path: package-lock.json
       - name: Install dependencies
@@ -259,7 +259,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24.11.0
           cache: npm
       - uses: actions/setup-java@v6
         with:
