@@ -8,7 +8,7 @@ import { test, expect } from '@playwright/test';
 import { seedMeasures, seedBestDEP, goToTab, fakeMeasure, waitForToast, readFromIDB, clearIDB } from './helpers';
 
 test.beforeEach(async ({ page }, testInfo) => {
-  const dbName = `AsthmeTrackDB_worker_${testInfo.workerIndex}`;
+  const dbName = `ChroniTrackDB_worker_${testInfo.workerIndex}`;
   await page.addInitScript((name) => localStorage.setItem('__TEST_DB_NAME__', name), dbName);
   await clearIDB(page, dbName);
   await page.addInitScript(() => localStorage.clear());
@@ -76,7 +76,7 @@ test.describe('JSON export / import', () => {
       page.waitForEvent('download'),
       page.locator('button[data-action="exportJSON"]').click(),
     ]);
-    expect(download.suggestedFilename()).toMatch(/^asthmetrack_backup_\d{4}-\d{2}-\d{2}\.json$/);
+    expect(download.suggestedFilename()).toMatch(/^chronictrack_backup_\d{4}-\d{2}-\d{2}\.json$/);
   });
 
   test('imported JSON replaces measures and shows toast', async ({ page }) => {
@@ -162,7 +162,7 @@ test.describe('Appearance — theme and language', () => {
     await goToTab(page, 'settings');
     await page.locator('button[data-action="setLang"][data-val="en"]').click();
     // Nav label for history tab should now be 'History'
-    await expect(page.locator('nav .nav-btn').nth(2)).toContainText('History');
+    await expect(page.locator('nav .nav-btn[data-val="historique"]')).toContainText('History');
   });
 
   test('switching back to French restores nav labels', async ({ page }) => {
@@ -170,7 +170,7 @@ test.describe('Appearance — theme and language', () => {
     await page.goto('/app/app.html');
     await goToTab(page, 'settings');
     await page.locator('button[data-action="setLang"][data-val="fr"]').click();
-    await expect(page.locator('nav .nav-btn').nth(2)).toContainText('Historique');
+    await expect(page.locator('nav .nav-btn[data-val="historique"]')).toContainText('Historique');
   });
 
 });

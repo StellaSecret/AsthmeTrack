@@ -8,7 +8,18 @@
 // Never commit a real Client ID here. Keep __GOOGLE_CLIENT_ID__ as the placeholder.
 const GOOGLE_CLIENT_ID = '__GOOGLE_CLIENT_ID__';
 const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.email';
-const GDRIVE_FILENAME = 'asthmetrack_data.json';
+const GDRIVE_FILENAME = 'chronictrack_data.json';
+const GDRIVE_LEGACY_FILENAMES = ['asthmetrack_data.json'];
+
+function _driveBackupQuery(fields) {
+  const names = [GDRIVE_FILENAME, ...GDRIVE_LEGACY_FILENAMES].map(n => `name='${n}'`).join(' or ');
+  return `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=(${names})&fields=${fields}`;
+}
+
+function _pickDriveBackup(files) {
+  if (!Array.isArray(files) || !files.length) return null;
+  return files.find(f => f.name === GDRIVE_FILENAME) || files[0];
+}
 const IS_CAPACITOR = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 
 // Pure business logic (loaded from logic.js). DOM-free, unit-tested, mutation-tested.
@@ -41,11 +52,14 @@ const DB = {
     driveTokenExpiry: 0,
     driveFileId: null,
     driveUser: null,
-    driveAvatar: null
+    driveAvatar: null,
+    conditions: { enabled: ['asthma','hypertension','diabetes'] },
+    conditionEntries: [],
+    medications: []
   },
   async load() {
     try {
-      const [m, b, r, p, dt, de, df, du, da] = await Promise.all([
+      const [m, b, r, p, dt, de, df, du, da, ce, meds, conds] = await Promise.all([
         SecureStore.load('at_measures'),
         SecureStore.load('at_bestDEP'),
         SecureStore.load('at_reminders'),
@@ -54,7 +68,10 @@ const DB = {
         SecureStore.load('at_driveTokenExpiry'),
         SecureStore.load('at_driveFileId'),
         SecureStore.load('at_driveUser'),
-        SecureStore.load('at_driveAvatar')
+        SecureStore.load('at_driveAvatar'),
+        SecureStore.load('at_conditionEntries'),
+        SecureStore.load('at_medications'),
+        SecureStore.load('at_conditions')
       ]);
       this._state.measures = JSON.parse(m || '[]');
       this._state.bestDEP = parseFloat(b || '450');
@@ -65,6 +82,21 @@ const DB = {
       this._state.driveFileId = df || null;
       this._state.driveUser = du || null;
       this._state.driveAvatar = da || null;
+      this._state.conditionEntries = JSON.parse(ce || '[]');
+      this._state.medications = JSON.parse(meds || '[]');
+      this._state.conditions = JSON.parse(conds || '{"enabled":["asthma","hypertension","diabetes"]}');
+      // Legacy default was asthma-only: upgrade unless the user chose it explicitly in Settings
+      { const c=this._state.conditions;
+        if(c && Array.isArray(c.enabled) && !c.custom && c.enabled.length===1 && c.enabled[0]==='asthma'){
+          c.enabled=['asthma','hypertension','diabetes'];
+        } }
+      // Migrate existing asthma measures to conditionEntries if empty
+      if((!this._state.conditionEntries || this._state.conditionEntries.length===0) && this._state.measures && this._state.measures.length>0){
+        try {
+          this._state.conditionEntries = migrateLegacyMeasures(this._state.measures);
+          SecureStore.save('at_conditionEntries', JSON.stringify(this._state.conditionEntries));
+        } catch(e){}
+      }
     } catch(e) { console.error('DB.load failed', e); }
   },
   get measures() { return this._state.measures; },
@@ -75,6 +107,12 @@ const DB = {
   set reminders(v) { this._state.reminders = v; SecureStore.save('at_reminders', JSON.stringify(v)); },
   get profile() { return this._state.profile; },
   set profile(v) { this._state.profile = v; SecureStore.save('at_profile', JSON.stringify(v)); },
+  get conditions() { return this._state.conditions; },
+  set conditions(v) { this._state.conditions = v; SecureStore.save('at_conditions', JSON.stringify(v)); },
+  get conditionEntries() { return this._state.conditionEntries; },
+  set conditionEntries(v) { this._state.conditionEntries = v; SecureStore.save('at_conditionEntries', JSON.stringify(v)); },
+  get medications() { return this._state.medications; },
+  set medications(v) { this._state.medications = v; SecureStore.save('at_medications', JSON.stringify(v)); },
 
   // ── token fields stay in SecureStore for asynchronous access ──────────
   // On Capacitor the token is persisted in CapacitorPreferences (secure
@@ -111,7 +149,7 @@ const SecureStore = {
   _prefs() { return IS_CAPACITOR && window.Capacitor?.Plugins?.Preferences || null; },
   async _getDB() {
     if (this._db) return this._db;
-    const dbName = localStorage.getItem('__TEST_DB_NAME__') || 'AsthmeTrackDB';
+    const dbName = localStorage.getItem('__TEST_DB_NAME__') || 'ChroniTrackDB';
     return new Promise((resolve, reject) => {
       const req = indexedDB.open(dbName, 1);
       req.onupgradeneeded = () => req.result.createObjectStore('kv');
@@ -167,12 +205,14 @@ const SecureStore = {
 };
 
 // ══════════════════════════════════════════
-//  I18N — Internationalisation (fr / en)
+
+  // I18N — Internationalisation (fr / en)
+
 // ══════════════════════════════════════════
 const LANG = {
   fr: {
     // nav
-    nav_dashboard: 'Tableau', nav_measure: 'Mesure', nav_history: 'Historique', nav_settings: 'Réglages',
+    nav_dashboard: 'Accueil', nav_history: 'Historique', nav_meds: 'Rx', nav_settings: 'Réglages',
     // dashboard
     db_no_data: 'Aucune mesure.<br/>Ajoutez votre première mesure.',
     db_active_reminders: 'Rappels actifs',
@@ -290,10 +330,14 @@ const LANG = {
     drive_plugin_unavailable: 'Plugin non disponible',
     prise_short: 'pr',
     // pdf
-    pdf_title: 'AsthmeTrack — Export des mesures',
+    pdf_title: 'ChroniTrack — Export des mesures',
     pdf_generated: (date, time) => `Généré le ${date} à ${time}`,
+    pdf_select_sub: 'Choisissez les données à inclure dans le rapport',
+    pdf_select_count: (n) => `${n} entrée${n > 1 ? 's' : ''}`,
+    pdf_select_none: 'Sélectionnez au moins une catégorie',
+    btn_pdf_export: 'Exporter le PDF',
     pdf_cols: ['Date','Heure','DEP','Souffles','Zone','SpO₂','Zone','Prises','Commentaire'],
-    pdf_footer: (n) => `AsthmeTrack • ${n} mesures exportées`,
+    pdf_footer: (n) => `ChroniTrack • ${n} mesures exportées`,
     pdf_charts_title: 'Graphes — évolution sur 14 jours',
     pdf_dep_label: 'DEP (L/min)',
     pdf_spo2_label: 'SpO₂ (%)',
@@ -330,10 +374,32 @@ const LANG = {
     settings_profile_label: 'DEP théorique',
     settings_profile_sub: 'Calculer selon votre profil',
     btn_profile_open: 'Calculer',
+    hub_title: 'Suivi',
+    hub_sub: 'Choisissez une condition',
+    panel_open: 'Ouvrir',
+    panel_add: 'Nouvelle mesure',
+    panel_no_data: 'Aucune donnée',
+    panel_last: 'Dernière',
+    cond_asthma: 'Asthme',
+    cond_hypertension: 'Hypertension',
+    cond_diabetes: 'Diabète',
+    cond_bp_title: 'Tension artérielle',
+    bp_short: 'TA',
+    cond_glucose_title: 'Glycémie',
+    detail_back: '← Accueil',
+    detail_history: 'Mesures récentes',
+    cat_normal: 'Normale', cat_elevated: 'Élevée', cat_stage1: 'Stade 1', cat_stage2: 'Stade 2', cat_crisis: 'Crise',
+    bp_chart: 'Tension — dernières mesures',
+    glucose_chart: 'Glycémie — dernières mesures',
+    toast_bp_saved: '✓ Tension enregistrée',
+    toast_bp_invalid: 'TA invalide',
+    toast_glucose_saved: '✓ Glycémie enregistrée',
+    toast_glucose_invalid: 'Glycémie invalide',
+    demo_banner: 'Mode Démo : données simulées (asthme, tension, diabète)',
   },
   en: {
     // nav
-    nav_dashboard: 'Dashboard', nav_measure: 'Measure', nav_history: 'History', nav_settings: 'Settings',
+    nav_dashboard: 'Home', nav_history: 'History', nav_meds: 'Meds', nav_settings: 'Settings',
     // dashboard
     db_no_data: 'No measurements.<br/>Add your first measurement.',
     db_active_reminders: 'Active reminders',
@@ -451,10 +517,14 @@ const LANG = {
     drive_plugin_unavailable: 'Plugin unavailable',
     prise_short: 'dose',
     // pdf
-    pdf_title: 'AsthmeTrack — Measurement export',
+    pdf_title: 'ChroniTrack — Measurement export',
     pdf_generated: (date, time) => `Generated on ${date} at ${time}`,
+    pdf_select_sub: 'Choose which data to include in the report',
+    pdf_select_count: (n) => `${n} entr${n === 1 ? 'y' : 'ies'}`,
+    pdf_select_none: 'Select at least one category',
+    btn_pdf_export: 'Export PDF',
     pdf_cols: ['Date','Time','PEF','Blows','Zone','SpO₂','Zone','Doses','Comment'],
-    pdf_footer: (n) => `AsthmeTrack • ${n} measurements exported`,
+    pdf_footer: (n) => `ChroniTrack • ${n} measurements exported`,
     pdf_charts_title: 'Charts — last 14 days',
     pdf_dep_label: 'PEF (L/min)',
     pdf_spo2_label: 'SpO₂ (%)',
@@ -491,6 +561,28 @@ const LANG = {
     settings_profile_label: 'Predicted PEF',
     settings_profile_sub: 'Calculate from your profile',
     btn_profile_open: 'Calculate',
+    hub_title: 'Tracking',
+    hub_sub: 'Choose a condition',
+    panel_open: 'Open',
+    panel_add: 'New entry',
+    panel_no_data: 'No data',
+    panel_last: 'Latest',
+    cond_asthma: 'Asthma',
+    cond_hypertension: 'Hypertension',
+    cond_diabetes: 'Diabetes',
+    cond_bp_title: 'Blood pressure',
+    bp_short: 'BP',
+    cond_glucose_title: 'Blood glucose',
+    detail_back: '← Home',
+    detail_history: 'Recent entries',
+    cat_normal: 'Normal', cat_elevated: 'Elevated', cat_stage1: 'Stage 1', cat_stage2: 'Stage 2', cat_crisis: 'Crisis',
+    bp_chart: 'Blood pressure — recent',
+    glucose_chart: 'Blood glucose — recent',
+    toast_bp_saved: '✓ Blood pressure saved',
+    toast_bp_invalid: 'Invalid blood pressure',
+    toast_glucose_saved: '✓ Glucose saved',
+    toast_glucose_invalid: 'Invalid glucose',
+    demo_banner: 'Demo mode: simulated data (asthma, blood pressure, diabetes)',
   },
 };
 
@@ -518,6 +610,7 @@ function _rerender() {
   if (page === 'dashboard')   renderDashboard();
   if (page === 'historique')  renderHistory();
   if (page === 'settings')    renderSettings();
+  if (page === 'condition')   renderConditionDetail();
   if (page === 'saisie')      renderSaisieLabels();
 }
 
@@ -566,12 +659,10 @@ function zoneClass(z){return'zone-'+z;}
 //  DYNAMIC LABEL HELPERS
 // ══════════════════════════════════════════
 function renderNav() {
-  const btns = document.querySelectorAll('.nav-btn');
-  const keys = ['nav_dashboard','nav_measure','nav_history','nav_settings'];
-  btns.forEach((btn, i) => {
-    // last child is the text node (after the svg)
-    const textNode = [...btn.childNodes].find(n => n.nodeType === 3 && n.textContent.trim());
-    if (textNode) textNode.textContent = '\n    ' + t(keys[i]) + '\n  ';
+  const keys = ['nav_dashboard','nav_history','nav_meds','nav_settings'];
+  document.querySelectorAll('.nav-btn').forEach((btn, i) => {
+    const span = btn.querySelector('span');
+    if (span && keys[i]) span.textContent = t(keys[i]);
   });
 }
 
@@ -793,42 +884,30 @@ function updateOfflineBanner() {
 }
 
 // ══════════════════════════════════════════
-//  HISTORY SWIPE-TO-DELETE  (touch)
-// ══════════════════════════════════════════
-let _swipeEl=null,_swipeStartX=0,_swipeId=null;
-function _initSwipe(el, id) {
-  el.addEventListener('touchstart', e => {
-    _swipeEl=el; _swipeStartX=e.touches[0].clientX; _swipeId=id;
-  }, {passive:true});
-  el.addEventListener('touchmove', e => {
-    if (_swipeEl!==el) return;
-    const dx = e.touches[0].clientX - _swipeStartX;
-    if (dx < 0) el.style.transform = `translateX(${Math.max(dx,-80)}px)`;
-  }, {passive:true});
-  el.addEventListener('touchend', () => {
-    if (_swipeEl!==el) return;
-    const m = el.style.transform.match(/-?\d+/);
-    const dx = m ? parseInt(m[0]) : 0;
-    if (dx <= -60) { el.style.transform=''; deleteMeasure(_swipeId); }
-    else { el.style.transform=''; }
-    _swipeEl=null;
-  });
-}
-
-// ══════════════════════════════════════════
 //  NAV
 // ══════════════════════════════════════════
 let currentPage='dashboard';
 function showPage(id,btn){
+  if(id==='saisie'||id==='saisie-htn'||id==='saisie-diabete') _editingEntryId=null;
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
-  document.getElementById('page-'+id).classList.add('active');
+  const target = document.getElementById('page-'+id);
+  if(target) target.classList.add('active');
   if(btn)btn.classList.add('active');
+  else {
+    document.querySelectorAll('.nav-btn').forEach(b=>{ if(b.dataset.val===id) b.classList.add('active'); });
+  }
   currentPage=id;
   if(id==='dashboard')renderDashboard();
+  if(id==='condition')renderConditionDetail();
   if(id==='historique')renderHistory();
   if(id==='settings')renderSettings();
+  if(id==='medications'){ try{ if(typeof renderMedications==='function') renderMedications(); }catch(e){} }
+  if(id==='saisie-htn'){ const el=document.getElementById('htnDatetime'); if(el){ try{ const now=new Date(); now.setSeconds(0,0); el.value=now.toISOString().slice(0,16); }catch(e){} }}
+  if(id==='saisie-diabete'){ const el=document.getElementById('dmDatetime'); if(el){ try{ const now=new Date(); now.setSeconds(0,0); el.value=now.toISOString().slice(0,16); }catch(e){} }}
   if(id==='saisie')initForm();
+  if(id==='saisie-htn'){ const el=document.getElementById('htnDatetime'); if(el){ const now=new Date(); now.setSeconds(0,0); el.value=now.toISOString().slice(0,16); }}
+  if(id==='saisie-diabete'){ const el=document.getElementById('dmDatetime'); if(el){ const now=new Date(); now.setSeconds(0,0); el.value=now.toISOString().slice(0,16); }}
 }
 
 // ══════════════════════════════════════════
@@ -908,6 +987,72 @@ function selectEasy(n){
   selectedEasy=n;
   document.querySelectorAll('#page-saisie .easyh-btn').forEach(b=>b.classList.toggle('selected',parseInt(b.dataset.val)===n));
 }
+function saveHTN(){
+  const sysEl=document.getElementById('htnSys'), diaEl=document.getElementById('htnDia'), pulEl=document.getElementById('htnPulse');
+  const sys = parseInt(sysEl&&sysEl.value);
+  const dia = parseInt(diaEl&&diaEl.value);
+  const pulse = parseInt(pulEl&&pulEl.value);
+  const posEl=document.getElementById('htnPos');
+  const pos = (posEl&&posEl.value)||'assis';
+  const comEl=document.getElementById('htnComment');
+  const comment = (comEl&&comEl.value)||'';
+  const dtEl=document.getElementById('htnDatetime');
+  const dt = (dtEl&&dtEl.value) || new Date().toISOString().slice(0,16);
+  if(isNaN(sys)||isNaN(dia)){ showToast(t('toast_bp_invalid')||'TA invalide','error'); return; }
+  const isEdit = !!_editingEntryId && (DB.conditionEntries||[]).some(x=>x.id===_editingEntryId && x.conditionId==='hypertension');
+  const editId = isEdit ? _editingEntryId : null;
+  const entry = { id: editId||nextId(), conditionId:'hypertension', type:'reading', timestamp: new Date(dt).toISOString(), data:{systolic:sys,diastolic:dia,pulse:isNaN(pulse)?null:pulse,position:pos,comment}, meta:{} };
+  if(isEdit) DB.conditionEntries = (DB.conditionEntries||[]).map(x=>x.id===editId?entry:x);
+  else DB.conditionEntries = [...(DB.conditionEntries||[]), entry];
+  _editingEntryId=null;
+  try{ if(sysEl) sysEl.value=''; if(diaEl) diaEl.value=''; if(pulEl) pulEl.value=''; if(comEl) comEl.value=''; }catch(e){}
+  showToast(t('toast_bp_saved')||'✓ Tension enregistrée');
+  driveAutoSync();
+  if(isEdit){ showPage('historique'); }
+  else { _activeCondition='hypertension'; setTimeout(()=>showCondition('hypertension'), 500); }
+}
+function saveDM(){
+  const glEl=document.getElementById('dmGlucose'), unEl=document.getElementById('dmUnit'), ctxEl=document.getElementById('dmContext'), inEl=document.getElementById('dmInsulin'), comEl=document.getElementById('dmComment'), dtEl=document.getElementById('dmDatetime');
+  const glucose = parseFloat(glEl&&glEl.value);
+  const unit = (unEl&&unEl.value)||'mg/dL';
+  const context = (ctxEl&&ctxEl.value)||'';
+  const insulin = parseFloat(inEl&&inEl.value);
+  const comment = (comEl&&comEl.value)||'';
+  const dt = (dtEl&&dtEl.value) || new Date().toISOString().slice(0,16);
+  if(isNaN(glucose)){ showToast(t('toast_glucose_invalid')||'Glycémie invalide','error'); return; }
+  const isEdit = !!_editingEntryId && (DB.conditionEntries||[]).some(x=>x.id===_editingEntryId && x.conditionId==='diabetes');
+  const editId = isEdit ? _editingEntryId : null;
+  const entry = { id: editId||nextId(), conditionId:'diabetes', type:'reading', timestamp: new Date(dt).toISOString(), data:{glucose,unit,context,insulin: isNaN(insulin)?null:insulin,meals:comment,comment}, meta:{} };
+  if(isEdit) DB.conditionEntries = (DB.conditionEntries||[]).map(x=>x.id===editId?entry:x);
+  else DB.conditionEntries = [...(DB.conditionEntries||[]), entry];
+  _editingEntryId=null;
+  try{ if(glEl) glEl.value=''; if(inEl) inEl.value=''; if(comEl) comEl.value=''; }catch(e){}
+  showToast(t('toast_glucose_saved')||'✓ Glycémie enregistrée');
+  driveAutoSync();
+  if(isEdit){ showPage('historique'); }
+  else { _activeCondition='diabetes'; setTimeout(()=>showCondition('diabetes'), 500); }
+}
+function addMedication(){
+  const name = (document.getElementById('medName')||{}).value||'';
+  const dose = (document.getElementById('medDose')||{}).value||'';
+  const freq = (document.getElementById('medFreq')||{}).value||'';
+  const cond = (document.getElementById('medCond')||{}).value||'asthma';
+  if(!name.trim()){ showToast('Nom requis','error'); return; }
+  DB.medications = [...(DB.medications||[]), {id: Date.now().toString(36), name:name.trim(), dose:dose.trim(), freq:freq.trim(), conditionId: cond, active:true}];
+  try{ document.getElementById('medName').value=''; document.getElementById('medDose').value=''; document.getElementById('medFreq').value=''; }catch(e){}
+  showToast('✓ Médicament ajouté');
+  if(typeof renderMedications==='function') renderMedications();
+  if(currentPage==='dashboard'&&typeof renderDashboard==='function') renderDashboard();
+}
+function renderMedications(){
+  const list = document.getElementById('medList');
+  if(!list) return;
+  const meds = DB.medications||[];
+  if(!meds.length){ list.innerHTML='<div style="color:var(--muted);padding:8px 0">Aucun médicament</div>'; return; }
+  list.innerHTML = meds.map((m,i)=>`<div style="padding:8px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:8px"><div><b>${esc(m.name||'')}</b> ${esc(m.dose||'')} ${esc(m.freq||'')}<div style="font-size:12px;color:var(--muted)">${esc(m.conditionId||'')}</div></div><button class="icon-action-btn del" data-action="removeMed" data-val="${i}" aria-label="Supprimer">✕</button></div>`).join('');
+}
+window.addMedication = addMedication;
+window.renderMedications = renderMedications;
 function saveMeasure(){
   const dep=calcDepAvgWithWarn(''),spo2=parseFloat(document.getElementById('inputSpO2').value),dt=document.getElementById('inputDatetime').value,comment=document.getElementById('inputComment').value.trim();
   const dep1=parseFloat(document.getElementById('dep1').value)||null,dep2=parseFloat(document.getElementById('dep2').value)||null,dep3=parseFloat(document.getElementById('dep3').value)||null;
@@ -917,11 +1062,17 @@ function saveMeasure(){
   if(!spo2||spo2<70||spo2>100){showToast(t('err_spo2'),'error');_flashFieldError('inputSpO2');return;}
   if(selectedEasy===null){showToast(t('err_easy'),'error');return;}
   const measures=DB.measures;
-  measures.unshift({id:nextId(),dt,dep,dep1,dep2,dep3,spo2,easy:selectedEasy,comment});
+  const measure = {id:nextId(),dt,dep,dep1,dep2,dep3,spo2,easy:selectedEasy,comment};
+  measures.unshift(measure);
   DB.measures=measures;
+  // Also add to conditionEntries
+  try {
+    const entry = { id: measure.id, conditionId:'asthma', type:'measure', timestamp: dt, data:{ dep, spo2, easyhaler: selectedEasy, comment, dep1,dep2,dep3 }, meta:{} };
+    DB.conditionEntries = [...(DB.conditionEntries||[]), entry];
+  } catch(e){}
   showToast(t('toast_saved'));
   driveAutoSync();
-  setTimeout(()=>showPage('dashboard',document.querySelector('.nav-btn')),800);
+  setTimeout(()=>{ _activeCondition='asthma'; showCondition('asthma'); },800);
 }
 
 // ══════════════════════════════════════════
@@ -975,92 +1126,192 @@ document.getElementById('editModal').addEventListener('click',function(e){if(e.t
 // ══════════════════════════════════════════
 //  DASHBOARD
 // ══════════════════════════════════════════
+function escHtml(x){ return (x==null?'':String(x)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function enabledConditions(){ return ((DB.conditions&&DB.conditions.enabled)||['asthma','hypertension','diabetes']).filter(Boolean); }
+function conditionEntriesOf(id){ return (DB.conditionEntries||[]).filter(e=>e&&e.conditionId===id).slice().sort((a,b)=>new Date(b.timestamp||0)-new Date(a.timestamp||0)); }
+function asthmaMeasures(){ return (DB.measures||[]).slice().sort((a,b)=>new Date(b.dt||0)-new Date(a.dt||0)); }
+function conditionLabel(id){
+  if(id==='asthma') return t('cond_asthma');
+  if(id==='hypertension') return t('cond_hypertension');
+  if(id==='diabetes') return t('cond_diabetes');
+  return id;
+}
+function conditionColor(id){ return (id==='hypertension'?'#f97316':id==='diabetes'?'#a78bfa':'#4f9cf9'); }
+function htnCategory(s,d){
+  const def=window.HypertensionCondition; if(def&&def.getCategory) return def.getCategory(s,d);
+  s=Number(s); d=Number(d); if(s>=180||d>=120) return 'crisis'; if(s>=140||d>=90) return 'stage2'; if(s>=130||d>=80) return 'stage1'; if(s>=120&&d<80) return 'elevated'; return 'normal';
+}
+function catLabel(c){ const k='cat_'+c; const v=t(k); return v===k?c:v; }
+function glucoseFlag(g,unit){
+  const mg = unit==='mmol/L' ? Number(g)*18 : Number(g);
+  if(!isFinite(mg)) return '';
+  if(mg<70) return 'low';
+  if(mg>180) return 'high';
+  return 'ok';
+}
+
+let _activeCondition = null;
+function showCondition(id){
+  _activeCondition = id;
+  showPage('condition');
+}
+
 function renderDashboard(){
-  const measures=DB.measures,cont=document.getElementById('dashboardContent');
+  const cont=document.getElementById('dashboardContent');
+  if(!cont) return;
   cont.innerHTML='';
-  if(!measures.length){
-    cont.innerHTML=`<div class="empty-state"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg><p>${t('db_no_data')}</p></div>`;return;
-  }
-  const last=measures[0],dz=depZone(last.dep,DB.bestDEP),sz=spo2Zone(last.spo2),depPct=Math.round((last.dep/DB.bestDEP)*100);
-  const depDetail=[last.dep1,last.dep2,last.dep3].filter(Boolean);
-  // Tri par date croissante pour les graphes (14 derniers jours chronologiques)
-  const recent=[...measures].sort((a,b)=>new Date(a.dt)-new Date(b.dt)).slice(-14);
-  const labels=recent.map(m=>{const d=new Date(m.dt);return d.getDate()+'/'+(d.getMonth()+1);});
-  const activeRem=DB.reminders.filter(r=>r.active);
-  const depTrend  = calcTrend(measures, 'dep');
-  const spo2Trend = calcTrend(measures, 'spo2');
-  const crisis    = isCrisis(measures, DB.bestDEP);
+  const enabled=enabledConditions();
+  const measures=asthmaMeasures();
+  const crisis=isCrisis ? isCrisis(measures, DB.bestDEP) : false;
 
-  // Crisis banner — static i18n text only, safe innerHTML
-  if(crisis){
-    cont.insertAdjacentHTML('beforeend', `<div class="crisis-banner"><div class="crisis-banner-icon">🚨</div><div class="crisis-banner-text"><div class="crisis-banner-title">${t('crisis_title')}</div><div class="crisis-banner-sub">${t('crisis_sub')}</div></div></div>`);
+  // Crisis banner on Accueil (safety)
+  if(crisis && enabled.includes('asthma')){
+    cont.insertAdjacentHTML('beforeend', `<div class="crisis-banner"><div class="crisis-banner-icon">🚨</div><div class="crisis-banner-text"><div class="crisis-banner-title">${escHtml(t('crisis_title'))}</div><div class="crisis-banner-sub">${escHtml(t('crisis_sub'))}</div></div></div>`);
   }
-
-  // Active reminders — user data: use textContent
+  // Reminders on Accueil
+  const activeRem=(DB.reminders||[]).filter(r=>r&&r.active);
   if(activeRem.length){
     const remCard=document.createElement('div');remCard.className='card';
     const remTitle=document.createElement('div');remTitle.className='card-title';remTitle.textContent=t('db_active_reminders');
     const remBody=document.createElement('div');
-    activeRem.forEach(r=>{
-      const badge=document.createElement('span');badge.className='reminder-badge';
-      badge.textContent=`🔔 ${r.time} — ${r.label}`;
-      remBody.appendChild(badge);
-    });
-    remCard.appendChild(remTitle);remCard.appendChild(remBody);
-    cont.appendChild(remCard);
+    activeRem.forEach(r=>{ const badge=document.createElement('span');badge.className='reminder-badge';badge.textContent=`🔔 ${r.time||''} — ${r.label||''}`;remBody.appendChild(badge); });
+    remCard.appendChild(remTitle);remCard.appendChild(remBody);cont.appendChild(remCard);
   }
 
-  // Last measure card — user data (dep, spo2, comment, easy) via textContent
-  const card=document.createElement('div');card.className='card';
+  const head=document.createElement('div');head.className='section-header';
+  head.innerHTML=`<div><div class="card-title" style="margin:0">${escHtml(t('hub_title'))}</div><div style="font-size:13px;color:var(--muted);margin-top:2px">${escHtml(t('hub_sub'))}</div></div>`;
+  cont.appendChild(head);
 
+  if(!enabled.length){
+    cont.insertAdjacentHTML('beforeend', `<div class="empty-state"><p>${escHtml(t('panel_no_data'))}</p></div>`);
+    return;
+  }
+  const panels=document.createElement('div');panels.className='condition-panels';
+  enabled.forEach(id=>{
+    const p=document.createElement('button');p.type='button';p.className='condition-panel';p.style.borderLeftColor=conditionColor(id);
+    p.setAttribute('data-action','showCondition');p.setAttribute('data-val',id);
+    let value=t('panel_no_data'), sub='', meta='';
+    if(id==='asthma'){
+      const last=measures[0];
+      if(last){
+        const dz=depZone?depZone(last.dep,DB.bestDEP):'green';
+        const pct = DB.bestDEP?Math.round((last.dep/DB.bestDEP)*100):null;
+        value = `${last.dep||'—'} L/min`;
+        sub = `${t('panel_last')}: ${new Date(last.dt).toLocaleDateString(t('locale'),{day:'2-digit',month:'short'})}`;
+        meta = `<span class="zone-badge ${zoneClass?zoneClass(dz):'zone-green'}">${escHtml(zoneLabel?zoneLabel(dz):dz)}</span>${pct!=null?`<span class="condition-chip">${pct}%</span>`:''}<span class="condition-chip">${measures.length}</span>`;
+      }
+    } else if(id==='hypertension'){
+      const e=conditionEntriesOf('hypertension')[0]; const d=e&&e.data||{};
+      if(e && d.systolic!=null){
+        value = `${d.systolic}/${d.diastolic} mmHg`;
+        const cat=htnCategory(d.systolic,d.diastolic);
+        sub = `${t('panel_last')}: ${new Date(e.timestamp).toLocaleDateString(t('locale'),{day:'2-digit',month:'short'})}`;
+        meta = `<span class="condition-chip">${escHtml(catLabel(cat))}</span>${d.pulse?`<span class="condition-chip">${d.pulse} bpm</span>`:''}<span class="condition-chip">${conditionEntriesOf('hypertension').length}</span>`;
+      }
+    } else if(id==='diabetes'){
+      const e=conditionEntriesOf('diabetes')[0]; const d=e&&e.data||{};
+      if(e && d.glucose!=null){
+        value = `${d.glucose} ${d.unit||'mg/dL'}`;
+        const fl=glucoseFlag(d.glucose,d.unit);
+        sub = `${t('panel_last')}: ${new Date(e.timestamp).toLocaleDateString(t('locale'),{day:'2-digit',month:'short'})}`;
+        meta = `${fl?`<span class="condition-chip">${escHtml(fl)}</span>`:''}${d.context?`<span class="condition-chip">${escHtml(d.context)}</span>`:''}<span class="condition-chip">${conditionEntriesOf('diabetes').length}</span>`;
+      }
+    }
+    p.innerHTML = `<div class="condition-panel-head"><div class="condition-panel-title">${escHtml(conditionLabel(id))}</div><div class="condition-panel-chevron">›</div></div><div class="condition-panel-value">${escHtml(String(value))}</div><div class="condition-panel-sub">${escHtml(sub)}</div><div class="condition-panel-meta">${meta}</div>`;
+    panels.appendChild(p);
+  });
+  cont.appendChild(panels);
+}
+
+function renderConditionDetail(){
+  const cont=document.getElementById('conditionDetail');
+  if(!cont) return;
+  const id=_activeCondition || enabledConditions()[0] || 'asthma';
+  _activeCondition=id;
+  cont.innerHTML='';
+  const back=document.createElement('button');back.className='condition-detail-back';back.type='button';back.setAttribute('data-action','showPage');back.setAttribute('data-val','dashboard');back.textContent=t('detail_back');
+  cont.appendChild(back);
+  if(id==='asthma') renderAsthmaDetail(cont);
+  else if(id==='hypertension') renderHypertensionDetail(cont);
+  else if(id==='diabetes') renderDiabetesDetail(cont);
+  else cont.insertAdjacentHTML('beforeend', `<div class="empty-state"><p>${escHtml(t('panel_no_data'))}</p></div>`);
+}
+
+function renderAsthmaDetail(cont){
+  const measures=asthmaMeasures();
+  const crisis=isCrisis?isCrisis(measures,DB.bestDEP):false;
+  const head=document.createElement('div');head.className='section-header';
+  head.innerHTML=`<div class="card-title" style="margin:0">${escHtml(t('cond_asthma'))}</div><button class="btn-inline primary" data-action="showPage" data-val="saisie">${escHtml(t('panel_add'))}</button>`;
+  cont.appendChild(head);
+  if(crisis){
+    cont.insertAdjacentHTML('beforeend', `<div class="crisis-banner"><div class="crisis-banner-icon">🚨</div><div class="crisis-banner-text"><div class="crisis-banner-title">${escHtml(t('crisis_title'))}</div><div class="crisis-banner-sub">${escHtml(t('crisis_sub'))}</div></div></div>`);
+  }
+  if(!measures.length){
+    cont.insertAdjacentHTML('beforeend', `<div class="empty-state"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg><p>${escHtml(t('db_no_data').replace(/<br\/?\s*>/gi,' '))}</p></div>`);
+    return;
+  }
+  const last=measures[0], dz=depZone(last.dep,DB.bestDEP), sz=spo2Zone(last.spo2), depPct=DB.bestDEP?Math.round((last.dep/DB.bestDEP)*100):null;
+  const depDetail=[last.dep1,last.dep2,last.dep3].filter(Boolean);
+  const recent=[...measures].sort((a,b)=>new Date(a.dt)-new Date(b.dt)).slice(-14);
+  const labels=recent.map(m=>{const d=new Date(m.dt);return d.getDate()+'/'+(d.getMonth()+1);});
+  const depTrend=calcTrend(measures,'dep');
+  const spo2Trend=calcTrend(measures,'spo2');
+
+  const card=document.createElement('div');card.className='card';
   const cardTitle=document.createElement('div');cardTitle.className='card-title';
   cardTitle.textContent=`${t('db_last_measure')} — ${new Date(last.dt).toLocaleDateString(t('locale'),{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}`;
   card.appendChild(cardTitle);
-
   const grid=document.createElement('div');grid.className='metrics-grid';
-
   const depBox=document.createElement('div');depBox.className=`metric-box ${dz}`;
-  const depLabel=document.createElement('div');depLabel.className='metric-label';depLabel.textContent=t('db_dep_avg');
-  const depVal=document.createElement('div');depVal.className='metric-value';
-  depVal.textContent=last.dep;
-  depVal.insertAdjacentHTML('beforeend', trendArrow(depTrend,'dep')); // trendArrow returns safe static HTML
-  const depUnit=document.createElement('div');depUnit.className='metric-unit';depUnit.textContent='L/min';
-  const depPctEl=document.createElement('div');depPctEl.className='metric-pct';depPctEl.textContent=`${depPct}% ${t('db_best_pct')}`;
-  depBox.appendChild(depLabel);depBox.appendChild(depVal);depBox.appendChild(depUnit);depBox.appendChild(depPctEl);
-  if(depDetail.length>1){const dm=document.createElement('div');dm.className='dep-measurements';dm.textContent=depDetail.join(' · ');depBox.appendChild(dm);}
-
+  depBox.innerHTML=`<div class="metric-label">${escHtml(t('db_dep_avg'))}</div><div class="metric-value">${escHtml(String(last.dep))}${trendArrow(depTrend,'dep')}</div><div class="metric-unit">L/min</div>${depPct!=null?`<div class="metric-pct">${depPct}% ${escHtml(t('db_best_pct'))}</div>`:''}${depDetail.length>1?`<div class="dep-measurements">${escHtml(depDetail.join(' · '))}</div>`:''}`;
   const spo2Box=document.createElement('div');spo2Box.className=`metric-box ${sz}`;
-  const spo2Label=document.createElement('div');spo2Label.className='metric-label';spo2Label.textContent='SpO₂';
-  const spo2Val=document.createElement('div');spo2Val.className='metric-value';
-  spo2Val.textContent=last.spo2;
-  spo2Val.insertAdjacentHTML('beforeend', trendArrow(spo2Trend,'spo2'));
-  const spo2Unit=document.createElement('div');spo2Unit.className='metric-unit';spo2Unit.textContent='%';
-  spo2Box.appendChild(spo2Label);spo2Box.appendChild(spo2Val);spo2Box.appendChild(spo2Unit);
-
-  grid.appendChild(depBox);grid.appendChild(spo2Box);
-  card.appendChild(grid);
-
+  spo2Box.innerHTML=`<div class="metric-label">SpO₂</div><div class="metric-value">${escHtml(String(last.spo2))}${trendArrow(spo2Trend,'spo2')}</div><div class="metric-unit">%</div>`;
+  grid.appendChild(depBox);grid.appendChild(spo2Box);card.appendChild(grid);
   const badges=document.createElement('div');badges.style.cssText='margin-top:12px;display:flex;gap:8px;flex-wrap:wrap';
-  const dBadge=document.createElement('span');dBadge.className=`zone-badge ${zoneClass(dz)}`;dBadge.textContent=zoneLabel(dz);
-  const sBadge=document.createElement('span');sBadge.className=`zone-badge ${zoneClass(sz)}`;sBadge.textContent=zoneLabel(sz);
-  const doseBadge=document.createElement('span');doseBadge.className='zone-badge';doseBadge.style.cssText='background:rgba(79,156,249,.1);color:var(--accent)';
-  doseBadge.textContent=`💊 ${last.easy} ${last.easy>1?t('dose_plural'):t('dose_singular')}`;
-  badges.appendChild(dBadge);badges.appendChild(sBadge);badges.appendChild(doseBadge);
+  badges.innerHTML=`<span class="zone-badge ${zoneClass(dz)}">${escHtml(zoneLabel(dz))}</span><span class="zone-badge ${zoneClass(sz)}">${escHtml(zoneLabel(sz))}</span><span class="zone-badge" style="background:rgba(79,156,249,.1);color:var(--accent)">💊 ${escHtml(String(last.easy))} ${escHtml(last.easy>1?t('dose_plural'):t('dose_singular'))}</span>`;
   card.appendChild(badges);
-
-  if(last.comment){
-    const commentEl=document.createElement('div');commentEl.style.cssText='margin-top:10px;font-size:14px;color:var(--muted);font-style:italic';
-    commentEl.textContent=`"${last.comment}"`;
-    card.appendChild(commentEl);
-  }
+  if(last.comment){ const c=document.createElement('div');c.style.cssText='margin-top:10px;font-size:14px;color:var(--muted);font-style:italic';c.textContent=`"${last.comment}"`;card.appendChild(c); }
   cont.appendChild(card);
+  cont.insertAdjacentHTML('beforeend', `<div class="card"><div class="card-title">${escHtml(t('db_dep_chart'))}</div><div class="chart-wrap"><canvas id="chartDEP"></canvas></div></div>`);
+  cont.insertAdjacentHTML('beforeend', `<div class="card"><div class="card-title">${escHtml(t('db_spo2_chart'))}</div><div class="chart-wrap"><canvas id="chartSPO2"></canvas></div></div>`);
+  drawLineChart('chartDEP',labels,recent.map(m=>m.dep),'#4f9cf9');
+  drawLineChart('chartSPO2',labels,recent.map(m=>m.spo2),'#10d9a0');
+}
 
-  // Chart cards — static structure, safe innerHTML
-  cont.insertAdjacentHTML('beforeend', `<div class="card"><div class="card-title">${t('db_dep_chart')}</div><div class="chart-wrap"><canvas id="chartDEP"></canvas></div></div>`);
-  cont.insertAdjacentHTML('beforeend', `<div class="card"><div class="card-title">${t('db_spo2_chart')}</div><div class="chart-wrap"><canvas id="chartSPO2"></canvas></div></div>`);
+function renderHypertensionDetail(cont){
+  const entries=conditionEntriesOf('hypertension');
+  const head=document.createElement('div');head.className='section-header';
+  head.innerHTML=`<div class="card-title" style="margin:0">${escHtml(t('cond_bp_title'))}</div><button class="btn-inline primary" data-action="showPage" data-val="saisie-htn">${escHtml(t('panel_add'))}</button>`;
+  cont.appendChild(head);
+  if(!entries.length){ cont.insertAdjacentHTML('beforeend', `<div class="empty-state"><p>${escHtml(t('panel_no_data'))}</p></div>`); return; }
+  const last=entries[0], d=last.data||{}, cat=htnCategory(d.systolic,d.diastolic);
+  const card=document.createElement('div');card.className='card';
+  card.innerHTML=`<div class="card-title">${escHtml(t('panel_last'))}</div><div class="condition-panel-value">${d.systolic||'—'}/${d.diastolic||'—'} <span style="font-size:16px;font-weight:600">mmHg</span></div><div class="condition-panel-meta"><span class="condition-chip">${escHtml(catLabel(cat))}</span>${d.pulse?`<span class="condition-chip">${d.pulse} bpm</span>`:''}${d.position?`<span class="condition-chip">${escHtml(d.position)}</span>`:''}</div><div class="condition-panel-sub" style="margin-top:8px">${escHtml(new Date(last.timestamp).toLocaleString(t('locale')))}</div>`;
+  cont.appendChild(card);
+  const recent=[...entries].reverse().slice(-14);
+  cont.insertAdjacentHTML('beforeend', `<div class="card"><div class="card-title">${escHtml(t('bp_chart'))}</div><div class="chart-wrap"><canvas id="chartBP"></canvas></div></div>`);
+  drawLineChart('chartBP',recent.map(e=>{const dt=new Date(e.timestamp);return dt.getDate()+'/'+(dt.getMonth()+1);}),recent.map(e=>(e.data||{}).systolic||0),'#f97316');
+  const list=document.createElement('div');list.className='card';list.innerHTML=`<div class="card-title">${escHtml(t('detail_history'))}</div>`;
+  entries.slice(0,10).forEach(e=>{ const x=e.data||{}; const c=htnCategory(x.systolic,x.diastolic); list.insertAdjacentHTML('beforeend', `<div style="padding:8px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;gap:8px"><div><b>${x.systolic}/${x.diastolic}</b> mmHg ${x.pulse?`• ${x.pulse}`:''}<div style="font-size:12px;color:var(--muted)">${escHtml(catLabel(c))}</div></div><div style="font-size:12px;color:var(--muted);text-align:right">${new Date(e.timestamp).toLocaleDateString(t('locale'))}</div></div>`); });
+  cont.appendChild(list);
+}
 
-  drawLineChart('chartDEP',labels,recent.map(m=>m.dep),'#4f9cf9',50,700);
-  drawLineChart('chartSPO2',labels,recent.map(m=>m.spo2),'#10d9a0',85,100);
+function renderDiabetesDetail(cont){
+  const entries=conditionEntriesOf('diabetes');
+  const head=document.createElement('div');head.className='section-header';
+  head.innerHTML=`<div class="card-title" style="margin:0">${escHtml(t('cond_glucose_title'))}</div><button class="btn-inline primary" data-action="showPage" data-val="saisie-diabete">${escHtml(t('panel_add'))}</button>`;
+  cont.appendChild(head);
+  if(!entries.length){ cont.insertAdjacentHTML('beforeend', `<div class="empty-state"><p>${escHtml(t('panel_no_data'))}</p></div>`); return; }
+  const last=entries[0], d=last.data||{}, fl=glucoseFlag(d.glucose,d.unit);
+  const card=document.createElement('div');card.className='card';
+  card.innerHTML=`<div class="card-title">${escHtml(t('panel_last'))}</div><div class="condition-panel-value">${d.glucose||'—'} <span style="font-size:16px;font-weight:600">${escHtml(d.unit||'mg/dL')}</span></div><div class="condition-panel-meta">${fl?`<span class="condition-chip">${escHtml(fl)}</span>`:''}${d.context?`<span class="condition-chip">${escHtml(d.context)}</span>`:''}${d.insulin!=null?`<span class="condition-chip">ins ${d.insulin}</span>`:''}</div><div class="condition-panel-sub" style="margin-top:8px">${escHtml(new Date(last.timestamp).toLocaleString(t('locale')))}</div>`;
+  cont.appendChild(card);
+  const recent=[...entries].reverse().slice(-14);
+  cont.insertAdjacentHTML('beforeend', `<div class="card"><div class="card-title">${escHtml(t('glucose_chart'))}</div><div class="chart-wrap"><canvas id="chartGlucose"></canvas></div></div>`);
+  drawLineChart('chartGlucose',recent.map(e=>{const dt=new Date(e.timestamp);return dt.getDate()+'/'+(dt.getMonth()+1);}),recent.map(e=>(e.data||{}).glucose||0),'#a78bfa');
+  const list=document.createElement('div');list.className='card';list.innerHTML=`<div class="card-title">${escHtml(t('detail_history'))}</div>`;
+  entries.slice(0,10).forEach(e=>{ const x=e.data||{}; list.insertAdjacentHTML('beforeend', `<div style="padding:8px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;gap:8px"><div><b>${x.glucose}</b> ${escHtml(x.unit||'mg/dL')} ${x.context?`• ${escHtml(x.context)}`:''}</div><div style="font-size:12px;color:var(--muted);text-align:right">${new Date(e.timestamp).toLocaleDateString(t('locale'))}</div></div>`); });
+  cont.appendChild(list);
 }
 
 function drawLineChart(id,labels,data,color,yMin,yMax){
@@ -1117,8 +1368,9 @@ function _buildHistoryItem(m) {
   const depDetail=[m.dep1,m.dep2,m.dep3].filter(Boolean);
 
   const item=document.createElement('div');item.className='history-item';
-  const swipeBg=document.createElement('div');swipeBg.className='history-swipe-bg';swipeBg.textContent='🗑';
-  item.appendChild(swipeBg);
+  const delBtn=document.createElement('button');delBtn.className='history-swipe-bg icon-action-btn del';delBtn.textContent='🗑';
+  delBtn.addEventListener('click',()=>deleteMeasure(m.id));
+  item.appendChild(delBtn);
 
   const body=document.createElement('div');body.style.flex='1';
   const dateLine=document.createElement('div');dateLine.className='history-date';dateLine.textContent=dateStr;
@@ -1149,26 +1401,81 @@ function _buildHistoryItem(m) {
   const actions=document.createElement('div');actions.className='history-actions';
   const editBtn=document.createElement('button');editBtn.className='icon-action-btn edit';editBtn.textContent='✏️';
   editBtn.addEventListener('click',()=>openEditModal(m.id));
-  const delBtn=document.createElement('button');delBtn.className='icon-action-btn del';delBtn.textContent='✕';
-  delBtn.addEventListener('click',()=>deleteMeasure(m.id));
-  actions.appendChild(editBtn);actions.appendChild(delBtn);
+  actions.appendChild(editBtn);
   item.appendChild(actions);
 
-  _initSwipe(item, m.id);
+  return item;
+}
+function _htnZoneClass(cat){ return cat==='normal'?'green':(cat==='elevated'||cat==='stage1')?'yellow':'red'; }
+function _glucoseZoneClass(fl){ return fl==='ok'?'green':fl==='low'?'red':'yellow'; }
+
+function _buildConditionHistoryItem(e){
+  const d=e.data||{},ts=new Date(e.timestamp||0);
+  const dateStr=ts.toLocaleDateString(t('locale'),{weekday:'short',day:'2-digit',month:'short'})+' '+ts.toLocaleTimeString(t('locale'),{hour:'2-digit',minute:'2-digit'});
+
+  const item=document.createElement('div');item.className='history-item';
+  const delBtn=document.createElement('button');delBtn.className='history-swipe-bg icon-action-btn del';delBtn.textContent='🗑';
+  delBtn.addEventListener('click',()=>deleteConditionEntry(e.id));
+  item.appendChild(delBtn);
+
+  const body=document.createElement('div');body.style.flex='1';
+  const dateLine=document.createElement('div');dateLine.className='history-date';dateLine.textContent=dateStr;
+  body.appendChild(dateLine);
+
+  const vals=document.createElement('div');vals.className='history-vals';
+  if(e.conditionId==='hypertension'){
+    const cat=htnCategory(d.systolic,d.diastolic);
+    const bpChip=document.createElement('span');bpChip.className=`history-chip zone-badge ${zoneClass(_htnZoneClass(cat))}`;
+    bpChip.textContent=`${t('bp_short')||'TA'} ${d.systolic||'—'}/${d.diastolic||'—'} mmHg`;
+    vals.appendChild(bpChip);
+    if(d.pulse){const c=document.createElement('span');c.className='history-chip';c.textContent=`♥ ${d.pulse} bpm`;vals.appendChild(c);}
+    if(d.position){const c=document.createElement('span');c.className='history-chip';c.textContent=`📍 ${d.position}`;vals.appendChild(c);}
+  } else if(e.conditionId==='diabetes'){
+    const fl=glucoseFlag(d.glucose,d.unit);
+    const glChip=document.createElement('span');glChip.className=`history-chip zone-badge ${zoneClass(_glucoseZoneClass(fl))}`;
+    glChip.textContent=`${t('cond_glucose_title')} ${d.glucose||'—'} ${d.unit||'mg/dL'}`;
+    vals.appendChild(glChip);
+    if(d.context){const c=document.createElement('span');c.className='history-chip';c.textContent=d.context;vals.appendChild(c);}
+    if(d.insulin!=null){const c=document.createElement('span');c.className='history-chip';c.style.color='var(--accent)';c.textContent=`💉 ${d.insulin} U`;vals.appendChild(c);}
+  }
+  body.appendChild(vals);
+
+  const note=e.conditionId==='hypertension'?d.comment:(d.comment||d.meals);
+  if(note){
+    const commentEl=document.createElement('div');commentEl.className='history-comment';
+    commentEl.textContent=`"${note}"`;
+    body.appendChild(commentEl);
+  }
+  item.appendChild(body);
+
+  const actions=document.createElement('div');actions.className='history-actions';
+  const editBtn=document.createElement('button');editBtn.className='icon-action-btn edit';editBtn.textContent='✏️';
+  editBtn.addEventListener('click',()=>openEntryEdit(e.id));
+  actions.appendChild(editBtn);
+  item.appendChild(actions);
+
   return item;
 }
 
 function renderHistory(reset=true){
-  const measures=DB.measures,cont=document.getElementById('historyList');
-  if(!measures.length){
-    cont.innerHTML=`<div class="empty-state"><p>${t('history_empty')}</p><button class="empty-state-cta" data-action="showSaisie">${t('btn_save_measure')}</button></div>`;
+  const cont=document.getElementById('historyList');
+  const measures=DB.measures||[];
+  const entries=(DB.conditionEntries||[]).filter(e=>e.conditionId && e.conditionId!=='asthma');
+  const items=[
+    ...measures.map(m=>({kind:'measure',ts:new Date(m.dt||0).getTime(),m})),
+    ...entries.map(e=>({kind:'entry',ts:new Date(e.timestamp||0).getTime(),e}))
+  ].sort((a,b)=>b.ts-a.ts);
+  if(!items.length){
+    cont.innerHTML=`<div class="empty-state"><p>${t('history_empty')}</p><button class="empty-state-cta" data-action="showPage" data-val="saisie">${t('btn_save_measure')}</button></div>`;
     return;
   }
   if(reset) _historyShown=HISTORY_PAGE_SIZE;
   cont.innerHTML='';
-  measures.slice(0,_historyShown).forEach(m=>cont.appendChild(_buildHistoryItem(m)));
-  if(measures.length>_historyShown){
-    const remaining=measures.length-_historyShown;
+  items.slice(0,_historyShown).forEach(it=>{
+    cont.appendChild(it.kind==='measure'?_buildHistoryItem(it.m):_buildConditionHistoryItem(it.e));
+  });
+  if(items.length>_historyShown){
+    const remaining=items.length-_historyShown;
     const loadBtn=document.createElement('button');
     loadBtn.className='btn-secondary';
     loadBtn.style.cssText='display:block;width:100%;margin:12px 0;';
@@ -1181,16 +1488,69 @@ function renderHistory(reset=true){
   }
 }
 function deleteMeasure(id){if(!confirm(t('toast_deleted_confirm')))return;DB.measures=DB.measures.filter(m=>m.id!==id);driveAutoSync();renderHistory();}
+function deleteConditionEntry(id){if(!confirm(t('toast_deleted_confirm')))return;DB.conditionEntries=(DB.conditionEntries||[]).filter(e=>e.id!==id);driveAutoSync();renderHistory();}
+
+let _editingEntryId=null;
+function _toLocalInput(iso){
+  const d=new Date(iso||Date.now()); if(isNaN(d)) return '';
+  const p=n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function openEntryEdit(id){
+  const e=(DB.conditionEntries||[]).find(x=>x.id===id); if(!e) return;
+  const d=e.data||{};
+  const set=(k,v)=>{const el=document.getElementById(k);if(el)el.value=v==null?'':v;};
+  if(e.conditionId==='hypertension'){
+    showPage('saisie-htn');
+    set('htnSys',d.systolic); set('htnDia',d.diastolic); set('htnPulse',d.pulse);
+    set('htnPos',d.position||'assis'); set('htnComment',d.comment||''); set('htnDatetime',_toLocalInput(e.timestamp));
+  } else if(e.conditionId==='diabetes'){
+    showPage('saisie-diabete');
+    set('dmGlucose',d.glucose); set('dmUnit',d.unit||'mg/dL'); set('dmContext',d.context||'');
+    set('dmInsulin',d.insulin); set('dmComment',d.comment||d.meals||''); set('dmDatetime',_toLocalInput(e.timestamp));
+  }
+  _editingEntryId=id;
+}
 
 // ══════════════════════════════════════════
 //  PDF EXPORT
 // ══════════════════════════════════════════
-function exportPDF(){
-  const measures=DB.measures;if(!measures.length){showToast(t('toast_pdf_no_data'),'error');return;}
-  if(!window.jspdf){showToast(t('toast_pdf_error'),'error');return;}
-  _doExportPDF(measures);
+function _pdfConditionCount(id){
+  return id==='asthma' ? (DB.measures||[]).length : conditionEntriesOf(id).length;
 }
-async function _doExportPDF(measures){
+function exportPDF(){
+  const ids=['asthma','hypertension','diabetes'];
+  if(ids.every(id=>!_pdfConditionCount(id))){showToast(t('toast_pdf_no_data'),'error');return;}
+  if(!window.jspdf){showToast(t('toast_pdf_error'),'error');return;}
+  openPdfModal();
+}
+function openPdfModal(){
+  const list=document.getElementById('pdfConditionList');
+  const modal=document.getElementById('pdfModal');
+  if(!list||!modal){ _doExportPDF(['asthma','hypertension','diabetes']); return; }
+  list.innerHTML='';
+  ['asthma','hypertension','diabetes'].forEach(id=>{
+    const n=_pdfConditionCount(id);
+    const row=document.createElement('label');row.className='pdf-cond-row'+(n?'':' disabled');
+    const cb=document.createElement('input');cb.type='checkbox';cb.value=id;cb.checked=n>0;cb.disabled=!n;
+    const name=document.createElement('span');name.className='pdf-cond-name';name.textContent=conditionLabel(id);
+    const count=document.createElement('span');count.className='pdf-cond-count';count.textContent=t('pdf_select_count',n);
+    row.appendChild(cb);row.appendChild(name);row.appendChild(count);
+    list.appendChild(row);
+  });
+  modal.classList.add('open');
+}
+function closePdfModal(){ document.getElementById('pdfModal').classList.remove('open'); }
+function confirmExportPDF(){
+  const selected=Array.from(document.querySelectorAll('#pdfConditionList input[type="checkbox"]:checked')).map(cb=>cb.value);
+  if(!selected.length){showToast(t('pdf_select_none'),'error');return;}
+  closePdfModal();
+  _doExportPDF(selected);
+}
+async function _doExportPDF(selected){
+  const sel=new Set(selected||[]);
+  const measures=sel.has('asthma')?(DB.measures||[]).slice():[];
+  const entries=(DB.conditionEntries||[]).filter(e=>e.conditionId && e.conditionId!=='asthma' && sel.has(e.conditionId)).slice().sort((a,b)=>new Date(a.timestamp||0)-new Date(b.timestamp||0));
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
   const blue=[79,156,249],dark=[22,25,32],muted=[150,160,175],rowAlt=[26,29,38];
@@ -1236,8 +1596,25 @@ async function _doExportPDF(measures){
     });
     y+=6;
   });
+  entries.forEach((e,idx)=>{
+    if(y>282){doc.addPage();doc.setFillColor(...dark);doc.rect(0,0,210,297,'F');y=15;}
+    const d=e.timestamp?new Date(e.timestamp):new Date();
+    let row;
+    if(e.conditionId==='hypertension'){
+      const h=e.data||{};
+      row=[d.toLocaleDateString('fr-FR'),d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}),`TA ${h.systolic||''}/${h.diastolic||''}`,'',h.pulse||'-',h.pulse||'-','-','-', (h.comment||'').slice(0,30)];
+    } else {
+      const dm=e.data||{};
+      row=[d.toLocaleDateString('fr-FR'),d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}),`Glyc ${dm.glucose||''} ${dm.unit||'mg/dL'}`,dm.context||'-','-',dm.glucose||'-','-','-', (dm.comment||dm.meals||'').slice(0,30)];
+    }
+    if((sorted.length+idx)%2===0){doc.setFillColor(...rowAlt);doc.rect(8,y-4,194,6,'F');}
+    doc.setFont('helvetica','normal');doc.setFontSize(7);
+    x=10;
+    row.forEach((cell,i)=>{ doc.setTextColor(...muted); doc.text(String(cell||''),x,y,{maxWidth:widths[i]-2}); x+=widths[i]; });
+    y+=6;
+  });
   doc.setTextColor(60,70,90);doc.setFontSize(7);
-  doc.text(t('pdf_footer',sorted.length),10,292);
+  doc.text(t('pdf_footer',sorted.length+entries.length),10,292);
 
   // ── Page 2 : Graphes DEP et SpO₂ ──────────────────────────────────────
   // Build data for charts from measures (chronological order, last 14)
@@ -1554,7 +1931,7 @@ async function _driveCheckAndPrompt() {
   setSync(true);
   try {
     const search = await fetch(
-      `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='${GDRIVE_FILENAME}'&fields=files(id,modifiedTime,size)`,
+      _driveBackupQuery('files(id,name,modifiedTime,size)'),
       { headers: { Authorization: "Bearer " + (await DB.getDriveToken()) } }
     );
     if (!search.ok) {
@@ -1567,7 +1944,8 @@ async function _driveCheckAndPrompt() {
     const sj = await search.json();
     setSync(false);
 
-    const hasRemote = sj.files && sj.files.length > 0;
+    const remote = _pickDriveBackup(sj.files);
+    const hasRemote = !!remote;
     const hasLocal = DB.measures && DB.measures.length > 0;
 
     if (!hasRemote && !hasLocal) {
@@ -1586,17 +1964,17 @@ async function _driveCheckAndPrompt() {
 
     if (hasRemote && !hasLocal) {
       // Backup Drive seulement → restaure directement
-      DB.driveFileId = sj.files[0].id;
+      DB.driveFileId = remote.id;
       await driveSyncDown();
       return;
     }
 
     // Les deux existent → affiche un choix explicite
-    const modDate = new Date(sj.files[0].modifiedTime).toLocaleDateString(t('locale'), {
+    const modDate = new Date(remote.modifiedTime).toLocaleDateString(t('locale'), {
       day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
     });
     const choice = confirm(t('drive_conflict', DB.measures.length, modDate));
-    DB.driveFileId = sj.files[0].id;
+    DB.driveFileId = remote.id;
     if (choice) {
       await driveSyncDown();
     } else {
@@ -1628,7 +2006,7 @@ async function driveSyncUp() {
   if (!await ensureValidToken()) { showToast(t('drive_not_connected'),'error'); return; }
   setSync(true);
   try {
-    const data = JSON.stringify({ measures: DB.measures, bestDEP: DB.bestDEP, reminders: DB.reminders, profile: DB.profile, version: 2 });
+    const data = JSON.stringify({ measures: DB.measures, bestDEP: DB.bestDEP, reminders: DB.reminders, profile: DB.profile, conditions: DB.conditions, conditionEntries: DB.conditionEntries, medications: DB.medications, version: 3 });
     const isUpdate = !!DB.driveFileId;
     const url = isUpdate
       // PATCH : mise à jour — pas de parents dans le metadata (erreur 403 sinon)
@@ -1675,7 +2053,7 @@ async function driveSyncDown() {
   setSync(true);
   try {
     const search = await fetch(
-      `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='${GDRIVE_FILENAME}'&fields=files(id)`,
+      _driveBackupQuery('files(id,name)'),
       { headers: { Authorization: "Bearer " + (await DB.getDriveToken()) } }
     );
     if (!search.ok) {
@@ -1684,17 +2062,21 @@ async function driveSyncDown() {
       throw new Error('API Drive ' + search.status + ' — ' + errText.slice(0,100));
     }
     const sj = await search.json();
-    if (!sj.files || !sj.files.length) { showToast(t('drive_no_backup_found')); setSync(false); return; }
-    DB.driveFileId = sj.files[0].id;
+    const remote = _pickDriveBackup(sj.files);
+    if (!remote) { showToast(t('drive_no_backup_found')); setSync(false); return; }
+    DB.driveFileId = remote.id;
     const dl = await fetch(
       `https://www.googleapis.com/drive/v3/files/${DB.driveFileId}?alt=media`,
       { headers: { Authorization: "Bearer " + (await DB.getDriveToken()) } }
     );
-    const d = await dl.json();
-    if (d.measures)  DB.measures  = d.measures;
-    if (d.bestDEP)   DB.bestDEP   = d.bestDEP;
-    if (d.reminders) DB.reminders = d.reminders;
-    if (d.profile)   DB.profile   = d.profile;
+    const d = migrateBackupData(await dl.json());
+    if (Array.isArray(d.measures))        DB.measures        = d.measures;
+    if (d.bestDEP)                        DB.bestDEP         = d.bestDEP;
+    if (Array.isArray(d.reminders))       DB.reminders       = d.reminders;
+    if (d.profile)                        DB.profile         = d.profile;
+    if (d.conditions)                     DB.conditions      = d.conditions;
+    if (Array.isArray(d.conditionEntries)) DB.conditionEntries = d.conditionEntries;
+    if (Array.isArray(d.medications))     DB.medications     = d.medications;
     showToast(t('drive_restored'));
     renderDashboard();
   } catch(e) { showToast('Erreur restauration Drive', 'error'); }
@@ -1716,12 +2098,58 @@ function setSync(on) {
 function checkOAuthRedirect() { /* plus utilisé — géré nativement par le plugin */ }
 
 // ══════════════════════════════════════════
+//  BACKUP MIGRATION (v1/v2 → v3)
+// ══════════════════════════════════════════
+function migrateLegacyMeasures(measures){
+  return (measures||[]).map(x=>({
+    id: x.id || (Date.now().toString(36)+Math.random().toString(36).slice(2,6)),
+    conditionId: 'asthma',
+    type: 'measure',
+    timestamp: x.dt || new Date().toISOString(),
+    data: {
+      dep: x.dep,
+      dep1: x.dep1,
+      dep2: x.dep2,
+      dep3: x.dep3,
+      spo2: x.spo2,
+      easyhaler: x.easy,
+      comment: x.comment
+    },
+    meta: { migratedFrom: 'asthma' }
+  }));
+}
+
+/** Normalizes any backup schema (v1/v2/v3 or Drive) into the current v3 shape. */
+function migrateBackupData(data){
+  if(!data || typeof data !== 'object') return data;
+  if(!Array.isArray(data.measures)) data.measures = [];
+  if(!data.version) data.version = 1;
+  if(data.version < 3){
+    // Old backups only have `measures`; synthesize v3 collections.
+    if((!Array.isArray(data.conditionEntries) || data.conditionEntries.length===0) && data.measures.length>0){
+      data.conditionEntries = migrateLegacyMeasures(data.measures);
+    }
+    if(!data.conditions) data.conditions = { enabled: ['asthma','hypertension','diabetes'] };
+    if(!Array.isArray(data.medications)) data.medications = [];
+    // Legacy default was asthma-only; match DB.load's upgrade unless the user customized it.
+    if(data.conditions && Array.isArray(data.conditions.enabled) && !data.conditions.custom && data.conditions.enabled.length===1 && data.conditions.enabled[0]==='asthma'){
+      data.conditions = { enabled: ['asthma','hypertension','diabetes'] };
+    }
+    data.version = 3;
+  }
+  if(!Array.isArray(data.conditionEntries)) data.conditionEntries = [];
+  if(!data.conditions) data.conditions = { enabled: ['asthma','hypertension','diabetes'] };
+  if(!Array.isArray(data.medications)) data.medications = [];
+  return data;
+}
+
+// ══════════════════════════════════════════
 //  JSON EXPORT / IMPORT
 // ══════════════════════════════════════════
 async function exportJSON() {
-  const payload = { measures: DB.measures, bestDEP: DB.bestDEP, reminders: DB.reminders, profile: DB.profile, version: 2 };
+  const payload = { measures: DB.measures, bestDEP: DB.bestDEP, reminders: DB.reminders, profile: DB.profile, conditions: DB.conditions, conditionEntries: DB.conditionEntries, medications: DB.medications, version: 3 };
   const jsonStr = JSON.stringify(payload, null, 2);
-  const filename = 'asthmetrack_backup_' + new Date().toISOString().slice(0,10) + '.json';
+  const filename = 'chronictrack_backup_' + new Date().toISOString().slice(0,10) + '.json';
 
   if (IS_CAPACITOR) {
     // Native: write to Documents via @capacitor/filesystem then share
@@ -1765,12 +2193,10 @@ function importJSON() {
     if (!file) return;
     try {
       const text = await file.text();
-      const data = JSON.parse(text);
+      const dataRaw = JSON.parse(text);
       // Basic schema validation
-      if (!Array.isArray(data.measures)) throw new Error(t('toast_json_invalid'));
-      // TODO(migration): when the schema changes, add a migrateBackup(data) function here
-      // that upgrades older version numbers (e.g. v1→v2) before writing to DB.
-      // Current export format is version 2. Older backups without a version field are v1.
+      if (!dataRaw || typeof dataRaw !== 'object' || !Array.isArray(dataRaw.measures)) throw new Error(t('toast_json_invalid'));
+      const data = migrateBackupData(dataRaw);
       const existing = DB.measures.length;
       if (existing > 0) {
         if (!confirm(t('import_confirm', data.measures.length, existing))) return;
@@ -1779,8 +2205,11 @@ function importJSON() {
       if (data.bestDEP)   DB.bestDEP   = data.bestDEP;
       if (data.reminders) DB.reminders = data.reminders;
       if (data.profile)   DB.profile   = data.profile;
+      if (data.conditions) DB.conditions = data.conditions;
+      if (data.conditionEntries) DB.conditionEntries = data.conditionEntries;
+      if (data.medications) DB.medications = data.medications;
       renderDashboard();
-      showToast(t('toast_json_imported', data.measures.length));
+      showToast(t('toast_json_imported', (data.measures&&data.measures.length)||0));
       driveAutoSync();
     } catch(err) {
       showToast(t('toast_json_import_err', (err.message||t('toast_json_invalid')).slice(0,60)), 'error');
@@ -1883,6 +2312,15 @@ function renderSettings(){
       <div class="setting-row"><span class="zone-badge zone-yellow">${t('zone_yellow')}</span><span style="font-size:14px;color:var(--muted)">${t('zone_yellow_desc')}</span></div>
       <div class="setting-row"><span class="zone-badge zone-red">${t('zone_red')}</span><span style="font-size:14px;color:var(--muted)">${t('zone_red_desc')}</span></div>
     </div>
+    <div class="card">
+      <div class="card-title">Conditions suivies</div>
+      <div class="card-sub">Activez le suivi pour diabète et hypertension</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
+        <label style="display:flex;align-items:center;gap:10px"><input type="checkbox" checked disabled> Asthme (obligatoire)</label>
+        <label style="display:flex;align-items:center;gap:10px"><input type="checkbox" data-action="toggleCond" data-val="hypertension" ${(DB.conditions&&DB.conditions.enabled||[]).includes('hypertension')?'checked':''}> Hypertension</label>
+        <label style="display:flex;align-items:center;gap:10px"><input type="checkbox" data-action="toggleCond" data-val="diabetes" ${(DB.conditions&&DB.conditions.enabled||[]).includes('diabetes')?'checked':''}> Diabète</label>
+      </div>
+    </div>
   `;
   // Inject user-controlled drive avatar/name via DOM — never via innerHTML
   if(isConnected){
@@ -1909,7 +2347,7 @@ function renderSettings(){
 }
 
 function saveBestDEP(){const v=parseFloat(document.getElementById('bestDEPInput').value);if(!v||v<100||v>900){showToast(t('toast_best_dep_invalid'),'error');return;}DB.bestDEP=v;showToast(t('toast_best_dep_saved'));}
-function clearAll(){if(!confirm(t('toast_clear_confirm')))return;DB.measures=[];showToast(t('toast_cleared'));}
+function clearAll(){if(!confirm(t('toast_clear_confirm')))return;DB.measures=[];DB.conditionEntries=[];showToast(t('toast_cleared'));}
 
 // ── REMINDERS ──
 let reminderTimers=[];
@@ -1962,14 +2400,14 @@ function scheduleReminders(){
         if(IS_CAPACITOR && window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications){
           const LN = window.Capacitor.Plugins.LocalNotifications;
           await LN.schedule({notifications:[{
-            title:'AsthmeTrack 💊',
+            title:'ChroniTrack 💊',
             body: r.label+' — Penser à votre Easyhaler !',
             id: Math.floor(Math.random()*100000),
             schedule:{ at: new Date(Date.now()+100) }
           }]});
         } else if(typeof Notification !== 'undefined' && Notification.permission==='granted'){
           // Fallback web
-          new Notification('AsthmeTrack 💊',{body:r.label+' — Penser à votre Easyhaler !'});
+          new Notification('ChroniTrack 💊',{body:r.label+' — Penser à votre traitement !'});
         }
       } catch(e){ console.warn('Notification error:', e); }
       scheduleReminders();
@@ -2021,13 +2459,25 @@ document.addEventListener('click', (e) => {
   if (action === 'saveBestDEP') saveBestDEP();
   if (action === 'addReminder') addReminder();
   if (action === 'setLang') setLang(val);
+  if (action === 'toggleCond') {
+    const c = DB.conditions || { enabled: ['asthma','hypertension','diabetes'] };
+    c.custom = true;
+    if (target.checked) { if (!c.enabled.includes(val)) c.enabled.push(val); }
+    else c.enabled = c.enabled.filter(x => x !== val);
+    DB.conditions = c;
+    showToast(t('toast_saved'));
+    renderDashboard();
+  }
   if (action === 'applyFont') { applyFont(val === 'true'); renderSettings(); }
   if (action === 'exportPDF') exportPDF();
+  if (action === 'confirmExportPDF') confirmExportPDF();
+  if (action === 'closePdfModal') closePdfModal();
   if (action === 'exportJSON') exportJSON();
   if (action === 'importJSON') importJSON();
   if (action === 'exportCSV') exportCSV();
   if (action === 'clearAll') clearAll();
-  if (action === 'showSaisie') showPage('saisie', document.querySelectorAll('.nav-btn')[1]);
+  if (action === 'showSaisie') showPage('saisie', null);
+  if (action === 'showCondition') showCondition(val);
   if (action === 'showPage') showPage(val, target);
   if (action === 'saveMeasure') saveMeasure();
   if (action === 'saveEdit') saveEdit();
@@ -2035,6 +2485,10 @@ document.addEventListener('click', (e) => {
   if (action === 'closeProfileModal') closeProfileModal();
   if (action === 'selectEasy') selectEasy(parseInt(val));
   if (action === 'selectEditEasy') selectEditEasy(parseInt(val));
+  if (action === 'saveHTN') { if(typeof saveHTN==='function') saveHTN(); }
+  if (action === 'saveDM') { if(typeof saveDM==='function') saveDM(); }
+  if (action === 'addMedication') { if(typeof addMedication==='function') { addMedication(); return; } if(typeof window.addMedication==='function'){ window.addMedication(); return; } }
+  if (action === 'removeMed') { const i=parseInt(val); if(isNaN(i)) return; const meds=(DB.medications||[]).slice(); meds.splice(i,1); DB.medications=meds; if(typeof renderMedications==='function') renderMedications(); if(currentPage==='dashboard'&&typeof renderDashboard==='function') renderDashboard(); return; }
   if (action === 'toggleTheme') {
       const dark = target.checked;
       applyTheme(dark);
@@ -2044,21 +2498,26 @@ document.addEventListener('click', (e) => {
 
 document.addEventListener('DOMContentLoaded', async ()=>{
   await DB.load();
+  if(!DB.conditions) DB.conditions={enabled:['asthma','hypertension','diabetes']};
+  if(!Array.isArray(DB.conditionEntries)) DB.conditionEntries=[];
+  if(!Array.isArray(DB.medications)) DB.medications=[];
   await SecureStore.init();
 
   // Demo mode check
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get('demo') === 'true') {
     const appTitle = document.getElementById('appTitle');
+    if (appTitle) appTitle.textContent = 'ChroniTrack';
     if (appTitle) appTitle.innerHTML += ' <span style="color:var(--accent); font-size:12px;">(DÉMO)</span>';
 
-    const mockMeasures = [];
     const now = Date.now();
+    const dayMs = 86400000;
+    const mockMeasures = [];
     for (let i = 13; i >= 0; i--) {
-      const dt = new Date(now - i * 86400000);
+      const dt = new Date(now - i * dayMs);
       const dep = 350 + Math.floor(Math.random() * 100);
       mockMeasures.push({
-        id: 100 + i,
+        id: 'demo-a-' + i,
         dt: dt.toISOString(),
         dep: dep,
         dep1: dep - 10,
@@ -2069,9 +2528,75 @@ document.addEventListener('DOMContentLoaded', async ()=>{
         comment: i === 0 ? 'Sensation de légèreté' : (i % 3 === 0 ? 'Pollens élevés' : '')
       });
     }
-    DB._state.measures = mockMeasures.reverse();
+    mockMeasures.reverse();
+    DB._state.measures = mockMeasures;
     DB._state.bestDEP = 450;
-    showToast('Mode Démo : données simulées');
+
+    // Shared condition entries across all tracked conditions
+    const mockEntries = mockMeasures.map(m => ({
+      id: m.id,
+      conditionId: 'asthma',
+      type: 'measure',
+      timestamp: new Date(m.dt).toISOString(),
+      data: { dep: m.dep, spo2: m.spo2, easyhaler: m.easy, comment: m.comment, dep1: m.dep1, dep2: m.dep2, dep3: m.dep3 },
+      meta: { demo: true }
+    }));
+    // Hypertension: one reading every 2 days, alternating positions/values
+    const htnPositions = ['assis', 'couché', 'debout'];
+    for (let i = 9; i >= 0; i--) {
+      const dt = new Date(now - i * 2 * dayMs);
+      const systolic = 118 + Math.floor(Math.random() * 35);
+      const diastolic = 74 + Math.floor(Math.random() * 18);
+      mockEntries.push({
+        id: 'demo-h-' + i,
+        conditionId: 'hypertension',
+        type: 'reading',
+        timestamp: dt.toISOString(),
+        data: {
+          systolic,
+          diastolic,
+          pulse: 62 + Math.floor(Math.random() * 20),
+          position: htnPositions[i % htnPositions.length],
+          comment: i === 0 ? 'Après le café' : ''
+        },
+        meta: { demo: true }
+      });
+    }
+    // Diabetes: one reading per day, mixed contexts and units
+    const dmContexts = ['à jeun', 'postprandial', 'avant repas', 'après repas'];
+    for (let i = 13; i >= 0; i--) {
+      const dt = new Date(now - i * dayMs + 3 * 3600000);
+      const mmol = i % 5 === 0;
+      const glucose = mmol ? (4.5 + Math.random() * 5.5).toFixed(1) : Math.round(80 + Math.random() * 110);
+      mockEntries.push({
+        id: 'demo-d-' + i,
+        conditionId: 'diabetes',
+        type: 'reading',
+        timestamp: dt.toISOString(),
+        data: {
+          glucose,
+          unit: mmol ? 'mmol/L' : 'mg/dL',
+          context: dmContexts[i % dmContexts.length],
+          insulin: i % 4 === 0 ? Math.round(4 + Math.random() * 8) : null,
+          meals: i % 3 === 0 ? 'Repas équilibré' : '',
+          comment: i === 0 ? 'Bonne journée' : ''
+        },
+        meta: { demo: true }
+      });
+    }
+    DB._state.conditionEntries = mockEntries;
+    DB._state.conditions = { enabled: ['asthma', 'hypertension', 'diabetes'] };
+    DB._state.medications = [
+      { id: 'demo-m1', name: 'Ventoline', dose: '100 µg', freq: 'Si besoin', conditionId: 'asthma', active: true },
+      { id: 'demo-m2', name: 'Amlodipine', dose: '5 mg', freq: '1×/jour', conditionId: 'hypertension', active: true },
+      { id: 'demo-m3', name: 'Metformine', dose: '500 mg', freq: '2×/jour', conditionId: 'diabetes', active: true }
+    ];
+    DB._state.reminders = [
+      { time: '08:00', label: 'Tension du matin', active: true },
+      { time: '20:00', label: 'Glycémie du soir', active: true }
+    ];
+    DB._state.profile = { sex: 'M', age: 45, height: 175 };
+    showToast(t('demo_banner') || 'Mode Démo : données simulées');
   }
 
   applyTheme(isDark());
@@ -2106,6 +2631,8 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   window.addEventListener('offline', updateOfflineBanner);
   // Profile modal close on backdrop click
   document.getElementById('profileModal').addEventListener('click', function(e){ if(e.target===this) closeProfileModal(); });
+  const pdfModalEl=document.getElementById('pdfModal');
+  if(pdfModalEl) pdfModalEl.addEventListener('click', function(e){ if(e.target===this) closePdfModal(); });
   renderDashboard();
   // Demande la permission de notifications au démarrage
   if (!IS_CAPACITOR && typeof Notification !== 'undefined' && Notification.permission === 'default') {
@@ -2115,6 +2642,29 @@ document.addEventListener('DOMContentLoaded', async ()=>{
     window.Capacitor.Plugins.LocalNotifications.requestPermissions().catch(function(){});
   }
   scheduleReminders(); // Les rappels utilisent le plugin natif
+  // Add medication functions
+  if(typeof window.addMedication==='undefined'){
+    window.addMedication = function(){
+      const name = (document.getElementById('medName')||{}).value||'';
+      const dose = (document.getElementById('medDose')||{}).value||'';
+      const freq = (document.getElementById('medFreq')||{}).value||'';
+      const cond = (document.getElementById('medCond')||{}).value||'asthma';
+      if(!name.trim()){ showToast('Nom requis','error'); return; }
+      DB.medications = [...(DB.medications||[]), {id:Date.now().toString(36), name:name.trim(), dose:dose.trim(), freq:freq.trim(), conditionId:cond, active:true}];
+      try{ document.getElementById('medName').value=''; document.getElementById('medDose').value=''; document.getElementById('medFreq').value=''; }catch(e){}
+      showToast('✓ Médicament ajouté');
+      if(typeof renderMedications==='function') renderMedications();
+      if(currentPage==='dashboard'&&typeof renderDashboard==='function') renderDashboard();
+    };
+    window.removeMedication = function(i){ const m=DB.medications||[]; m.splice(i,1); DB.medications=m; renderMedications(); };
+    window.renderMedications = function(){
+      const list = document.getElementById('medList');
+      if(!list) return;
+      const meds = DB.medications||[];
+      if(!meds.length){ list.innerHTML='<div style="color:var(--muted)">Aucun médicament</div>'; return; }
+      list.innerHTML = meds.map((m,i)=>`<div style="padding:8px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between"><div><b>${m.name}</b> ${m.dose||''} ${m.freq||''}<div style="font-size:12px;color:var(--muted)">${m.conditionId}</div></div><button class="icon-action-btn del" data-action="removeMed" data-val="${i}">✕</button></div>`).join('');
+    };
+  }
   const el=document.getElementById('inputDatetime');
   if(el){const now=new Date();now.setSeconds(0,0);el.value=now.toISOString().slice(0,16);}
   });

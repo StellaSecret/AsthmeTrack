@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { seedReminders, goToTab, waitForToast, readFromIDB, clearIDB } from './helpers';
 
 test.beforeEach(async ({ page }, testInfo) => {
-  const dbName = `AsthmeTrackDB_worker_${testInfo.workerIndex}`;
+  const dbName = `ChroniTrackDB_worker_${testInfo.workerIndex}`;
   await page.addInitScript((name) => localStorage.setItem('__TEST_DB_NAME__', name), dbName);
   await clearIDB(page, dbName);
   await page.addInitScript(() => localStorage.clear());

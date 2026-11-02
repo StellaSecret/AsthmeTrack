@@ -1,6 +1,6 @@
 {
   "appId": "com.stellasecret.asthmetrack",
-  "appName": "AsthmeTrack",
+  "appName": "ChroniTrack",
   "webDir": "www/app",
   "plugins": {
     "SocialLogin": {

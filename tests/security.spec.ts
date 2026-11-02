@@ -61,9 +61,10 @@ test.describe('XSS — measure comment in dashboard (#2)', () => {
     await seedMeasures(page, [fakeMeasure({ comment: XSS })]);
     await seedBestDEP(page, 450);
     await page.goto('/app/app.html');
-    await page.waitForSelector('#dashboardContent .card');
+    await page.locator('[data-action="showCondition"][data-val="asthma"]').click();
+    await page.waitForSelector('#conditionDetail .card');
     // The comment should appear as literal text, not trigger onerror
-    const cardText = await page.locator('#dashboardContent').innerText();
+    const cardText = await page.locator('#conditionDetail').innerText();
     expect(cardText).toContain('<img');
     expect(await xssExecuted(page)).toBe(false);
   });
@@ -72,7 +73,8 @@ test.describe('XSS — measure comment in dashboard (#2)', () => {
     await seedMeasures(page, [fakeMeasure({ comment: XSS_SCRIPT })]);
     await seedBestDEP(page, 450);
     await page.goto('/app/app.html');
-    await page.waitForSelector('#dashboardContent .card');
+    await page.locator('[data-action="showCondition"][data-val="asthma"]').click();
+    await page.waitForSelector('#conditionDetail .card');
     expect(await xssExecuted(page)).toBe(false);
   });
 
@@ -371,8 +373,8 @@ test.describe('Future date validation in saveMeasure (fix 2)', () => {
     await form.locator('#inputSpO2').fill('97');
     await form.locator('.easyh-btn[data-val="1"]').click();
     await form.locator('button.btn-primary').click();
-    await page.waitForSelector('#page-dashboard.active', { timeout: 3000 });
-    await expect(page.locator('#page-dashboard')).toHaveClass(/active/);
+    await page.waitForSelector('#page-condition.active', { timeout: 3000 });
+    await expect(page.locator('#page-condition')).toHaveClass(/active/);
   });
 
 });

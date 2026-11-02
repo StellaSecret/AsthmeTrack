@@ -1,4 +1,4 @@
-# AsthmeTrack
+# ChroniTrack
 
 A mobile-first asthma tracking app built with Capacitor (Android / iOS) and a single-file vanilla JS/HTML frontend. Records PEF (DEP) blows, SpO₂, Easyhaler doses, and optional comments. Syncs to Google Drive. Exports to PDF or JSON.
 

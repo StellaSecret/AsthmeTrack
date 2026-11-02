@@ -8,7 +8,7 @@ import {
 } from './helpers';
 
 test.beforeEach(async ({ page }, testInfo) => {
-  const dbName = `AsthmeTrackDB_worker_${testInfo.workerIndex}`;
+  const dbName = `ChroniTrackDB_worker_${testInfo.workerIndex}`;
   await page.addInitScript((name) => localStorage.setItem('__TEST_DB_NAME__', name), dbName);
   await clearIDB(page, dbName);
   await page.addInitScript(() => localStorage.clear());
@@ -33,18 +33,18 @@ test.describe('Smoke & navigation', () => {
     await expect(page.locator('#page-dashboard')).toHaveClass(/active/);
   });
 
-  test('all four tabs navigate correctly', async ({ page }) => {
+  test('core nav tabs navigate correctly', async ({ page }) => {
     await page.goto('/app/app.html');
-    for (const tab of ['saisie', 'historique', 'settings'] as const) {
+    for (const tab of ['historique', 'settings'] as const) {
       await goToTab(page, tab);
       await expect(page.locator(`#page-${tab}`)).toHaveClass(/active/);
     }
   });
 
-  test('empty dashboard shows empty-state', async ({ page }) => {
+  test('empty dashboard shows condition panels', async ({ page }) => {
     await page.goto('/app/app.html');
-    await page.waitForSelector('#dashboardContent .empty-state');
-    await expect(page.locator('.empty-state')).toBeVisible();
+    await page.waitForSelector('#dashboardContent .condition-panels');
+    await expect(page.locator('.condition-panel')).toHaveCount(3);
   });
 
 });
@@ -54,19 +54,19 @@ test.describe('Smoke & navigation', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 test.describe('Measure form — happy paths', () => {
 
-  test('saving a valid measure redirects to dashboard', async ({ page }) => {
+  test('saving a valid measure opens asthma condition detail', async ({ page }) => {
     await seedBestDEP(page, 450);
     await page.goto('/app/app.html');
     await addMeasure(page, { datetime: '2025-01-15T08:00', dep1: 380, dep2: 390, dep3: 400, spo2: 97, easy: 1 });
-    await page.waitForSelector('#page-dashboard.active', { timeout: 3000 });
-    await expect(page.locator('#page-dashboard')).toHaveClass(/active/);
+    await page.waitForSelector('#page-condition.active', { timeout: 4000 });
+    await expect(page.locator('#conditionDetail')).toContainText(/390|380|400|L\/min/);
   });
 
   test('saved measure appears in history', async ({ page }) => {
     await seedBestDEP(page, 450);
     await page.goto('/app/app.html');
     await addMeasure(page, { datetime: '2025-06-15T09:00', dep1: 410, dep2: 420, dep3: 415, spo2: 98, easy: 2, comment: 'Good day' });
-    await page.waitForSelector('#page-dashboard.active');
+    await page.waitForSelector('#page-condition.active', { timeout: 4000 });
     await goToTab(page, 'historique');
     await expect(page.locator('.history-item')).toHaveCount(1);
     await expect(page.locator('.history-item').first()).toContainText('415');
@@ -282,40 +282,45 @@ test.describe('Dashboard — metrics & zones', () => {
     ]);
     await seedBestDEP(page, 450);
     await page.goto('/app/app.html');
-    await page.waitForSelector('#dashboardContent .metric-value');
-    await expect(page.locator('.metric-value').first()).toContainText('440');
+    await page.locator('[data-action="showCondition"][data-val="asthma"]').click();
+    await page.waitForSelector('#conditionDetail .metric-value');
+    await expect(page.locator('#conditionDetail .metric-value').first()).toContainText('440');
   });
 
   test('green zone when DEP >= 80% of best', async ({ page }) => {
     await seedMeasures(page, [fakeMeasure({ dep: 340 })]);
     await seedBestDEP(page, 400); // 340/400 = 85%
     await page.goto('/app/app.html');
-    await page.waitForSelector('#dashboardContent .metric-box');
-    await expect(page.locator('.metric-box.green').first()).toBeVisible();
+    await page.locator('[data-action="showCondition"][data-val="asthma"]').click();
+    await page.waitForSelector('#conditionDetail .metric-box');
+    await expect(page.locator('#conditionDetail .metric-box.green').first()).toBeVisible();
   });
 
   test('yellow zone when DEP is 60–80% of best', async ({ page }) => {
     await seedMeasures(page, [fakeMeasure({ dep: 280 })]);
     await seedBestDEP(page, 400); // 280/400 = 70%
     await page.goto('/app/app.html');
-    await page.waitForSelector('#dashboardContent .metric-box');
-    await expect(page.locator('.metric-box.yellow').first()).toBeVisible();
+    await page.locator('[data-action="showCondition"][data-val="asthma"]').click();
+    await page.waitForSelector('#conditionDetail .metric-box');
+    await expect(page.locator('#conditionDetail .metric-box.yellow').first()).toBeVisible();
   });
 
   test('red zone when DEP < 60% of best', async ({ page }) => {
     await seedMeasures(page, [fakeMeasure({ dep: 220 })]);
     await seedBestDEP(page, 500); // 220/500 = 44%
     await page.goto('/app/app.html');
-    await page.waitForSelector('#dashboardContent .metric-box');
-    await expect(page.locator('.metric-box.red').first()).toBeVisible();
+    await page.locator('[data-action="showCondition"][data-val="asthma"]').click();
+    await page.waitForSelector('#conditionDetail .metric-box');
+    await expect(page.locator('#conditionDetail .metric-box.red').first()).toBeVisible();
   });
 
   test('dose count shows on dashboard', async ({ page }) => {
     await seedMeasures(page, [fakeMeasure({ easy: 3 })]);
     await seedBestDEP(page, 400);
     await page.goto('/app/app.html');
-    await page.waitForSelector('#dashboardContent .metric-value');
-    await expect(page.locator('#dashboardContent')).toContainText('3');
+    await page.locator('[data-action="showCondition"][data-val="asthma"]').click();
+    await page.waitForSelector('#conditionDetail .metric-value');
+    await expect(page.locator('#conditionDetail')).toContainText('3');
   });
 
 });
@@ -327,7 +332,7 @@ test.describe('Dashboard — crisis banner', () => {
     await seedMeasures(page, fakeMeasureSequence(2, 100, 97)); // dep=100, best=500 → 20%
     await seedBestDEP(page, 500);
     await page.goto('/app/app.html');
-    await page.waitForSelector('#dashboardContent');
+    await page.waitForSelector('#conditionDetail, #dashboardContent .condition-panels');
     await expect(page.locator('.crisis-banner')).toBeVisible();
   });
 
@@ -335,7 +340,8 @@ test.describe('Dashboard — crisis banner', () => {
     await seedMeasures(page, fakeMeasureSequence(2, 420, 97)); // dep=420, best=500 → 84%
     await seedBestDEP(page, 500);
     await page.goto('/app/app.html');
-    await page.waitForSelector('#dashboardContent .metric-value');
+    await page.locator('[data-action="showCondition"][data-val="asthma"]').click();
+    await page.waitForSelector('#conditionDetail .metric-value');
     await expect(page.locator('.crisis-banner')).not.toBeVisible();
   });
 
@@ -346,7 +352,8 @@ test.describe('Dashboard — crisis banner', () => {
     ]);
     await seedBestDEP(page, 500);
     await page.goto('/app/app.html');
-    await page.waitForSelector('#dashboardContent .metric-value');
+    await page.locator('[data-action="showCondition"][data-val="asthma"]').click();
+    await page.waitForSelector('#conditionDetail .metric-value');
     await expect(page.locator('.crisis-banner')).not.toBeVisible();
   });
 
@@ -371,7 +378,8 @@ test.describe('Dashboard — trend arrows', () => {
     await seedMeasures(page, measures);
     await seedBestDEP(page, 500);
     await page.goto('/app/app.html');
-    await page.waitForSelector('#dashboardContent .metric-value');
+    await page.locator('[data-action="showCondition"][data-val="asthma"]').click();
+    await page.waitForSelector('#conditionDetail .metric-value');
     await expect(page.locator('.trend-up').first()).toBeVisible();
   });
 
@@ -390,7 +398,8 @@ test.describe('Dashboard — trend arrows', () => {
     await seedMeasures(page, measures);
     await seedBestDEP(page, 500);
     await page.goto('/app/app.html');
-    await page.waitForSelector('#dashboardContent .metric-value');
+    await page.locator('[data-action="showCondition"][data-val="asthma"]').click();
+    await page.waitForSelector('#conditionDetail .metric-value');
     await expect(page.locator('.trend-down').first()).toBeVisible();
   });
 
@@ -409,7 +418,8 @@ test.describe('Dashboard — trend arrows', () => {
     await seedMeasures(page, measures);
     await seedBestDEP(page, 500);
     await page.goto('/app/app.html');
-    await page.waitForSelector('#dashboardContent .metric-value');
+    await page.locator('[data-action="showCondition"][data-val="asthma"]').click();
+    await page.waitForSelector('#conditionDetail .metric-value');
     await expect(page.locator('.trend-flat').first()).toBeVisible();
   });
 
@@ -568,7 +578,7 @@ test.describe('i18n — language switch', () => {
 
   test('default language is French', async ({ page }) => {
     await page.goto('/app/app.html');
-    await page.waitForSelector('#dashboardContent');
+    await page.waitForSelector('#conditionDetail, #dashboardContent .condition-panels');
     await expect(page.locator('html')).toHaveAttribute('lang', 'fr');
   });
 
@@ -746,9 +756,9 @@ test.describe('JSON export / import', () => {
     await goToTab(page, 'settings');
     const [download] = await Promise.all([
       page.waitForEvent('download'),
-      page.locator('button.btn-secondary', { hasText: /JSON/ }).first().click(),
+      page.locator('[data-action="exportJSON"]').click(),
     ]);
-    expect(download.suggestedFilename()).toMatch(/asthmetrack_backup.*\.json/);
+    expect(download.suggestedFilename()).toMatch(/chronictrack_backup.*\.json/);
   });
 
   test('exported JSON contains measures and profile', async ({ page }) => {
@@ -759,7 +769,7 @@ test.describe('JSON export / import', () => {
     await goToTab(page, 'settings');
     const [download] = await Promise.all([
       page.waitForEvent('download'),
-      page.locator('button.btn-secondary', { hasText: /JSON/ }).first().click(),
+      page.locator('[data-action="exportJSON"]').click(),
     ]);
     const stream = await download.createReadStream();
     const chunks: Buffer[] = [];
@@ -768,7 +778,7 @@ test.describe('JSON export / import', () => {
     expect(parsed.measures).toHaveLength(1);
     expect(parsed.measures[0].dep).toBe(410);
     expect(parsed.profile.sex).toBe('M');
-    expect(parsed.version).toBe(2);
+    expect(parsed.version).toBe(3);
   });
 
   test('importing invalid JSON shows error toast', async ({ page }) => {
@@ -777,7 +787,7 @@ test.describe('JSON export / import', () => {
     // intercept the file chooser and provide invalid JSON
     const [fileChooser] = await Promise.all([
       page.waitForEvent('filechooser'),
-      page.locator('button.btn-secondary', { hasText: /Importer|Import/ }).click(),
+      page.locator('[data-action="importJSON"]').click(),
     ]);
     await fileChooser.setFiles({
       name: 'bad.json',
@@ -800,7 +810,7 @@ test.describe('JSON export / import', () => {
     page.on('dialog', d => d.accept()); // confirm overwrite
     const [fileChooser] = await Promise.all([
       page.waitForEvent('filechooser'),
-      page.locator('button.btn-secondary', { hasText: /Importer|Import/ }).click(),
+      page.locator('[data-action="importJSON"]').click(),
     ]);
     await fileChooser.setFiles({
       name: 'backup.json',

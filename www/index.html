@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AsthmeTrack — Suivi intelligent de vos mesures respiratoires</title>
-  <meta name="description" content="AsthmeTrack — suivez votre DEP, votre SpO₂ et vos prises de traitement en toute simplicité. Données privées, sur votre Google Drive, sans serveur tiers.">
+  <title>ChroniTrack — Suivi intelligent de vos données de santé</title>
+  <meta name="description" content="ChroniTrack — suivez votre asthme, votre tension artérielle et votre diabète en toute simplicité. Données privées, sur votre Google Drive, sans serveur tiers.">
   <meta name="theme-color" content="#0d0f14">
-  <meta property="og:title" content="AsthmeTrack — Suivi intelligent de vos mesures respiratoires">
-  <meta property="og:description" content="Suivez votre DEP, votre SpO₂ et vos prises de traitement. Données privées, sur votre Google Drive, sans serveur tiers.">
+  <meta property="og:title" content="ChroniTrack — Suivi intelligent de vos données de santé">
+  <meta property="og:description" content="Suivez votre asthme, votre tension et votre glycémie. Données privées, sur votre Google Drive, sans serveur tiers.">
   <meta property="og:type" content="website">
-  <meta property="og:url" content="https://stellasecret.github.io/AsthmeTrack/">
-  <meta property="og:image" content="https://stellasecret.github.io/AsthmeTrack/icon.png">
+  <meta property="og:url" content="https://stellasecret.github.io/ChroniTrack/">
+  <meta property="og:image" content="https://stellasecret.github.io/ChroniTrack/icon.png">
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -265,7 +265,7 @@
 
 <!-- NAV -->
 <nav class="nav">
-  <a class="nav-logo" href="index.html">AsthmeTrack</a>
+  <a class="nav-logo" href="index.html">ChroniTrack</a>
   <div class="nav-links">
     <a href="index.html" class="active" data-i18n="nav_home">Accueil</a>
     <a href="app/app.html?demo=true" data-i18n="nav_demo">Démo</a>
@@ -280,7 +280,7 @@
 <!-- HERO -->
 <section class="hero">
   <div class="hero-content">
-    <p class="hero-eyebrow" data-i18n="hero_eyebrow">Asthme &amp; santé respiratoire</p>
+    <p class="hero-eyebrow" data-i18n="hero_eyebrow">Asthme · Hypertension · Diabète</p>
     <h1 class="hero-title" data-i18n="hero_title">Suivez ce qui <em>compte vraiment</em></h1>
     <p class="hero-sub" data-i18n="hero_sub">
       DEP, SpO₂, prises de traitement — tout dans une même vue.
@@ -353,7 +353,7 @@
 <!-- FEATURES -->
 <section class="features">
   <div class="features-inner">
-    <p class="section-eyebrow" data-i18n="feat_eyebrow">Ce qui rend AsthmeTrack différent</p>
+    <p class="section-eyebrow" data-i18n="feat_eyebrow">Ce qui rend ChroniTrack différent</p>
     <div class="features-grid">
       <div class="feature">
         <div class="feature-icon">💨</div>
@@ -458,7 +458,7 @@
 
 <!-- FOOTER -->
 <footer>
-  <div class="footer-logo">AsthmeTrack</div>
+  <div class="footer-logo">ChroniTrack</div>
   <div class="footer-links">
     <a href="app/app.html?demo=true" data-i18n="nav_demo">Démo</a>
     <a href="app/app.html" data-i18n="nav_app">App</a>
@@ -475,7 +475,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const t = {
     fr: {
       nav_home: "Accueil", nav_demo: "Démo", nav_privacy: "Privacy", nav_app: "Lancer l'app",
-      hero_eyebrow: "Asthme & santé respiratoire",
+      hero_eyebrow: "Asthme · Hypertension · Diabète",
       hero_title: "Suivez ce qui <em>compte vraiment</em>",
       hero_sub: "DEP, SpO₂, prises de traitement — tout dans une même vue. Vos données restent les vôtres : sauvegardées sur votre Google Drive, jamais sur nos serveurs.",
       how_eyebrow: "Comment ça marche",
@@ -483,7 +483,7 @@ document.addEventListener('DOMContentLoaded', () => {
       step2_title: "Visualisez votre évolution", step2_sub: "Tableau de bord avec graphiques de tendances. Identifiez d'un coup d'œil les jours difficiles.",
       step3_title: "Comparez à votre DEP théorique", step3_sub: "Entrez votre profil (âge, sexe, taille). L'app calcule votre valeur de référence et affiche votre zone du jour.",
       step4_title: "Exportez en PDF", step4_sub: "Générez un rapport complet de votre historique pour le partager avec votre médecin.",
-      feat_eyebrow: "Ce qui rend AsthmeTrack différent",
+      feat_eyebrow: "Ce qui rend ChroniTrack différent",
       feat1_title: "DEP sur 3 souffles", feat1_sub: "Saisissez chaque souffle individuellement. La meilleure valeur et la moyenne sont calculées en temps réel.",
       feat2_title: "Zones de trafic colorées", feat2_sub: "Vert, jaune, rouge — selon votre DEP théorique. Un regard suffit pour évaluer votre état du jour.",
       feat3_title: "Google Drive personnel", feat3_sub: "Vos données sont sauvegardées dans votre propre Drive. Ni serveur tiers, ni partage sans votre accord.",
@@ -504,7 +504,7 @@ document.addEventListener('DOMContentLoaded', () => {
     },
     en: {
       nav_home: "Home", nav_demo: "Demo", nav_privacy: "Privacy", nav_app: "Launch App",
-      hero_eyebrow: "Asthma & respiratory health",
+      hero_eyebrow: "Asthma · Hypertension · Diabetes",
       hero_title: "Track what <em>really matters</em>",
       hero_sub: "PEF, SpO₂, treatment doses — all in one view. Your data stays yours: saved to your Google Drive, never on our servers.",
       how_eyebrow: "How it works",
@@ -512,7 +512,7 @@ document.addEventListener('DOMContentLoaded', () => {
       step2_title: "Visualize your progress", step2_sub: "Dashboard with trend charts. Identify difficult days at a glance.",
       step3_title: "Compare to predicted PEF", step3_sub: "Enter your profile (age, sex, height). The app calculates your reference value and shows your daily zone.",
       step4_title: "Export to PDF", step4_sub: "Generate a complete history report to share with your doctor.",
-      feat_eyebrow: "What makes AsthmeTrack different",
+      feat_eyebrow: "What makes ChroniTrack different",
       feat1_title: "PEF on 3 blows", feat1_sub: "Enter each blow individually. The best value and average are calculated in real-time.",
       feat2_title: "Color-coded zones", feat2_sub: "Green, yellow, red — based on your predicted PEF. A quick glance evaluates your daily status.",
       feat3_title: "Personal Google Drive", feat3_sub: "Your data is saved to your own Drive. No third-party servers, no sharing without your consent.",

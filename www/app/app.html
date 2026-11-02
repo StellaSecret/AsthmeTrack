@@ -4,8 +4,8 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="theme-color" id="metaThemeColor" content="#0d0f14"/>
-<meta http-equiv="Content-Security-Policy" content="default-src 'self' capacitor:; script-src 'self' capacitor: https://accounts.google.com; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://www.googleapis.com https://accounts.google.com capacitor:; frame-src https://accounts.google.com; object-src 'none'"/>
-<title>AsthmeTrack</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' capacitor:; script-src 'self' capacitor: https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://www.googleapis.com https://accounts.google.com capacitor:; frame-src https://accounts.google.com; object-src 'none'"/>
+  <title>ChroniTrack</title>
 <!-- Outfit & Lexend: primary fonts -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -19,7 +19,7 @@
 
 <header class="app-header">
   <a href="../index.html" class="back-link">←</a>
-  <h1 id="appTitle">AsthmeTrack</h1>
+  <h1 id="appTitle">ChroniTrack</h1>
   <div class="header-right">
     <div id="syncIndicator" style="font-size:13px;color:var(--muted);display:none">↕ Drive</div>
     <div class="status-dot" id="statusDot"></div>
@@ -32,7 +32,7 @@
 <!-- SAISIE -->
 <div id="page-saisie" class="page">
   <div class="card">
-    <div class="card-title" data-i18n="new_measure">Nouvelle mesure</div>
+      <div class="card-title" data-i18n="new_measure">Nouvelle mesure (Asthme)</div>
     <div class="field">
       <label data-i18n="label_datetime">Date &amp; heure</label>
       <input type="datetime-local" id="inputDatetime"/>
@@ -72,12 +72,69 @@
   </div>
 </div>
 
+<div id="page-saisie-htn" class="page">
+  <div class="section-header"><div class="card-title" style="margin:0">Tension artérielle (Hypertension)</div></div>
+  <div class="card" style="margin:16px">
+    <div class="form-row">
+      <div class="field"><label>Date & heure</label><input type="datetime-local" id="htnDatetime" class="form-input"></div>
+    </div>
+    <div class="form-row">
+      <div class="field"><label>Systolique (mmHg)</label><input type="number" id="htnSys" class="form-input" placeholder="120"></div>
+      <div class="field"><label>Diastolique (mmHg)</label><input type="number" id="htnDia" class="form-input" placeholder="80"></div>
+    </div>
+    <div class="form-row">
+      <div class="field"><label>Pouls (bpm)</label><input type="number" id="htnPulse" class="form-input" placeholder="72"></div>
+      <div class="field"><label>Position</label><select id="htnPos" class="form-input"><option value="assis">Assis</option><option value="couché">Couché</option><option value="debout">Debout</option></select></div>
+    </div>
+    <div class="field"><label>Commentaire (facultatif)</label><textarea id="htnComment" rows="3" placeholder="Médicaments, stress..."></textarea></div>
+    <button class="btn-primary" data-action="saveHTN">Enregistrer la mesure</button>
+  </div>
+</div>
+
+<div id="page-saisie-diabete" class="page">
+  <div class="section-header"><div class="card-title" style="margin:0">Glycémie (Diabète)</div></div>
+  <div class="card" style="margin:16px">
+    <div class="form-row">
+      <div class="field"><label>Date & heure</label><input type="datetime-local" id="dmDatetime" class="form-input"></div>
+    </div>
+    <div class="form-row">
+      <div class="field"><label>Glycémie</label><input type="number" step="0.1" id="dmGlucose" class="form-input" placeholder="100"></div>
+      <div class="field"><label>Unité</label><select id="dmUnit" class="form-input"><option value="mg/dL">mg/dL</option><option value="mmol/L">mmol/L</option></select></div>
+    </div>
+    <div class="form-row">
+      <div class="field"><label>Contexte</label><select id="dmContext" class="form-input"><option value="à jeun">À jeun</option><option value="postprandial">Postprandial</option><option value="avant repas">Avant repas</option><option value="après repas">Après repas</option><option value="aléatoire">Aléatoire</option></select></div>
+      <div class="field"><label>Insuline (UI)</label><input type="number" step="0.5" id="dmInsulin" class="form-input" placeholder="0"></div>
+    </div>
+    <div class="field"><label>Repas / Commentaire</label><textarea id="dmComment" rows="3" placeholder="Repas, activité..."></textarea></div>
+    <button class="btn-primary" data-action="saveDM">Enregistrer la mesure</button>
+  </div>
+</div>
+
+<div id="page-medications" class="page">
+  <div class="section-header"><div class="card-title" style="margin:0">Médicaments</div></div>
+  <div class="card" style="margin:12px 16px">
+    <div class="form-row">
+      <div class="field"><label>Nom</label><input type="text" id="medName" class="form-input" placeholder="Ex. Metformine"></div>
+      <div class="field"><label>Posologie</label><input type="text" id="medDose" class="form-input" placeholder="Ex. 500mg"></div>
+    </div>
+    <div class="form-row">
+      <div class="field"><label>Fréquence</label><input type="text" id="medFreq" class="form-input" placeholder="Ex. 1x/jour"></div>
+      <div class="field"><label>Condition</label><select id="medCond" class="form-input"><option value="asthma">Asthme</option><option value="hypertension">Hypertension</option><option value="diabetes">Diabète</option><option value="other">Autre</option></select></div>
+    </div>
+    <button class="btn-primary" data-action="addMedication">Ajouter</button>
+  </div>
+  <div class="card" style="margin:12px 16px"><div class="card-title">Liste</div><div id="medList"></div></div>
+</div>
+
+<!-- DÉTAIL CONDITION -->
+<div id="page-condition" class="page"><div id="conditionDetail"></div></div>
+
 <!-- HISTORIQUE -->
 <div id="page-historique" class="page">
   <div class="section-header">
     <div class="card-title" style="margin:0" data-i18n="history_title">Historique</div>
-    <button class="icon-btn" data-action="exportPDF" title="Exporter PDF">
-      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+    <button class="icon-btn" title="Exporter PDF" data-action="exportPDF">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
     </button>
   </div>
   <div id="historyList"></div>
@@ -88,20 +145,20 @@
 
 <nav class="nav">
   <button class="nav-btn active" data-action="showPage" data-val="dashboard">
-    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
-    Tableau
-  </button>
-  <button class="nav-btn" data-action="showPage" data-val="saisie">
-    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
-    Mesure
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+    <span>Accueil</span>
   </button>
   <button class="nav-btn" data-action="showPage" data-val="historique">
-    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-    Historique
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>
+    <span>Hist.</span>
+  </button>
+  <button class="nav-btn" data-action="showPage" data-val="medications">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="10" width="18" height="4" rx="1"/><path d="M12 6v12"/></svg>
+    <span>Rx</span>
   </button>
   <button class="nav-btn" data-action="showPage" data-val="settings">
-    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-    Réglages
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6M1 12h6m6 0h6"/></svg>
+    <span>Régl.</span>
   </button>
 </nav>
 
@@ -173,9 +230,27 @@
   </div>
 </div>
 
+<!-- PDF EXPORT MODAL -->
+<div class="modal-overlay" id="pdfModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" data-i18n="settings_export_pdf_label">Exporter PDF</div>
+      <button class="modal-close" data-action="closePdfModal">✕</button>
+    </div>
+    <p class="pdf-modal-sub" data-i18n="pdf_select_sub">Choisissez les données à inclure dans le rapport</p>
+    <div class="pdf-cond-list" id="pdfConditionList"></div>
+    <button class="btn-primary" data-action="confirmExportPDF" data-i18n="btn_pdf_export">Exporter le PDF</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script src="logic.js" defer></script>
+<script src="conditions/registry.js" defer></script>
+<script src="conditions/asthma/index.js" defer></script>
+<script src="conditions/hypertension/index.js" defer></script>
+<script src="conditions/diabetes/index.js" defer></script>
+<script src="shared/utils.js" defer></script>
 <script src="app.js" defer></script>
 </body>
 </html>

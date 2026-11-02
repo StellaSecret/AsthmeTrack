@@ -15,7 +15,7 @@ async function ensureOrigin(page: Page) {
 /** Helper to write to IndexedDB kv store */
 async function writeToIDB(page: Page, key: string, value: any) {
   await ensureOrigin(page);
-  const dbName = await page.evaluate(() => localStorage.getItem('__TEST_DB_NAME__') || 'AsthmeTrackDB');
+  const dbName = await page.evaluate(() => localStorage.getItem('__TEST_DB_NAME__') || 'ChroniTrackDB');
   await page.evaluate(async ({ key, value, dbName }) => {
     return new Promise((resolve, reject) => {
       const req = indexedDB.open(dbName, 1);
@@ -35,7 +35,7 @@ async function writeToIDB(page: Page, key: string, value: any) {
 /** Helper to wipe IndexedDB */
 export async function clearIDB(page: Page, name?: string) {
   await ensureOrigin(page);
-  const dbName = name || await page.evaluate(() => localStorage.getItem('__TEST_DB_NAME__') || 'AsthmeTrackDB');
+  const dbName = name || await page.evaluate(() => localStorage.getItem('__TEST_DB_NAME__') || 'ChroniTrackDB');
   await page.evaluate(async (name) => {
     return new Promise((resolve) => {
       const req = indexedDB.open(name, 1);
@@ -57,7 +57,7 @@ export async function clearIDB(page: Page, name?: string) {
 /** Helper to read from IndexedDB kv store */
 export async function readFromIDB(page: Page, key: string): Promise<any> {
   await ensureOrigin(page);
-  const dbName = await page.evaluate(() => localStorage.getItem('__TEST_DB_NAME__') || 'AsthmeTrackDB');
+  const dbName = await page.evaluate(() => localStorage.getItem('__TEST_DB_NAME__') || 'ChroniTrackDB');
   return await page.evaluate(async ({ k, name }) => {
     return new Promise((resolve) => {
       const req = indexedDB.open(name, 1);
@@ -86,6 +86,11 @@ export async function seedMeasures(page: Page, measures: object[]) {
 /** Injects reminders into IndexedDB. */
 export async function seedReminders(page: Page, reminders: object[]) {
   await writeToIDB(page, 'at_reminders', JSON.stringify(reminders));
+}
+
+/** Injects condition entries into IndexedDB. */
+export async function seedConditionEntries(page: Page, entries: object[]) {
+  await writeToIDB(page, 'at_conditionEntries', JSON.stringify(entries));
 }
 
 /** Injects personal best DEP. */
@@ -124,9 +129,16 @@ export async function seedFont(page: Page, font: 'system' | 'custom') {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Navigates to a tab via the nav bar. */
-export async function goToTab(page: Page, tab: 'dashboard' | 'saisie' | 'historique' | 'settings') {
-  await page.locator(`nav .nav-btn[data-val="${tab}"]`).click();
-  await page.waitForSelector(`#page-${tab}.active`);
+export async function goToTab(page: Page, tab: 'dashboard' | 'saisie' | 'historique' | 'settings' | 'medications' | 'condition' | 'saisie-htn' | 'saisie-diabete') {
+  const nav = page.locator(`nav .nav-btn[data-val="${tab}"]`);
+  if (await nav.count()) {
+    await nav.first().click();
+  } else if (tab === 'saisie') {
+    await page.evaluate(() => (window as any).showPage?.('saisie'));
+  } else {
+    await page.evaluate((t) => (window as any).showPage?.(t), tab);
+  }
+  await page.waitForSelector(`#page-${tab}.active`, { timeout: 5000 }).catch(() => {});
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

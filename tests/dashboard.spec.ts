@@ -17,7 +17,7 @@ test.describe('Crisis banner', () => {
     ]);
     await seedBestDEP(page, 450);
     await page.goto('/app/app.html');
-    await page.waitForSelector('#dashboardContent .crisis-banner');
+    await page.waitForSelector('.crisis-banner');
     await expect(page.locator('.crisis-banner')).toBeVisible();
   });
 
@@ -28,7 +28,7 @@ test.describe('Crisis banner', () => {
     ]);
     await seedBestDEP(page, 450);
     await page.goto('/app/app.html');
-    await page.waitForSelector('#dashboardContent .card');
+    await page.waitForSelector('#dashboardContent .condition-panel, #dashboardContent .card');
     await expect(page.locator('.crisis-banner')).toHaveCount(0);
   });
 
@@ -38,7 +38,7 @@ test.describe('Crisis banner', () => {
     ]);
     await seedBestDEP(page, 450);
     await page.goto('/app/app.html');
-    await page.waitForSelector('#dashboardContent .card');
+    await page.waitForSelector('#dashboardContent .condition-panel, #dashboardContent .card');
     await expect(page.locator('.crisis-banner')).toHaveCount(0);
   });
 
@@ -51,33 +51,37 @@ test.describe('Zone logic', () => {
     await seedMeasures(page, [fakeMeasure({ dep: 350 })]);
     await seedBestDEP(page, 500);
     await page.goto('/app/app.html');
-    await page.waitForSelector('#dashboardContent .metric-box');
-    await expect(page.locator('.metric-box.yellow').first()).toBeVisible();
+    await page.locator('[data-action="showCondition"][data-val="asthma"]').click();
+    await page.waitForSelector('#conditionDetail .metric-box');
+    await expect(page.locator('#conditionDetail .metric-box.yellow').first()).toBeVisible();
   });
 
   test('SpO2 green zone: >= 95%', async ({ page }) => {
     await seedMeasures(page, [fakeMeasure({ spo2: 97 })]);
     await seedBestDEP(page, 400);
     await page.goto('/app/app.html');
-    await page.waitForSelector('#dashboardContent .metric-box');
+    await page.locator('[data-action="showCondition"][data-val="asthma"]').click();
+    await page.waitForSelector('#conditionDetail .metric-box');
     // Second metric-box is SpO2
-    await expect(page.locator('.metric-box').nth(1)).toHaveClass(/green/);
+    await expect(page.locator('#conditionDetail .metric-box').nth(1)).toHaveClass(/green/);
   });
 
   test('SpO2 red zone: < 90%', async ({ page }) => {
     await seedMeasures(page, [fakeMeasure({ spo2: 88 })]);
     await seedBestDEP(page, 400);
     await page.goto('/app/app.html');
-    await page.waitForSelector('#dashboardContent .metric-box');
-    await expect(page.locator('.metric-box').nth(1)).toHaveClass(/red/);
+    await page.locator('[data-action="showCondition"][data-val="asthma"]').click();
+    await page.waitForSelector('#conditionDetail .metric-box');
+    await expect(page.locator('#conditionDetail .metric-box').nth(1)).toHaveClass(/red/);
   });
 
   test('SpO2 yellow zone: 90–94%', async ({ page }) => {
     await seedMeasures(page, [fakeMeasure({ spo2: 92 })]);
     await seedBestDEP(page, 400);
     await page.goto('/app/app.html');
-    await page.waitForSelector('#dashboardContent .metric-box');
-    await expect(page.locator('.metric-box').nth(1)).toHaveClass(/yellow/);
+    await page.locator('[data-action="showCondition"][data-val="asthma"]').click();
+    await page.waitForSelector('#conditionDetail .metric-box');
+    await expect(page.locator('#conditionDetail .metric-box').nth(1)).toHaveClass(/yellow/);
   });
 
 });
@@ -91,6 +95,7 @@ test.describe('Charts', () => {
     ]);
     await seedBestDEP(page, 450);
     await page.goto('/app/app.html');
+    await page.locator('[data-action="showCondition"][data-val="asthma"]').click();
     await page.waitForSelector('#chartDEP');
     const depW  = await page.locator('#chartDEP').evaluate((c: HTMLCanvasElement) => c.width);
     const spo2W = await page.locator('#chartSPO2').evaluate((c: HTMLCanvasElement) => c.width);
@@ -128,12 +133,13 @@ test.describe('Offline banner', () => {
 
 test.describe('Easyhaler dose display on dashboard', () => {
 
-  test('dose count appears in the dashboard card', async ({ page }) => {
+  test('dose count appears in the asthma detail', async ({ page }) => {
     await seedMeasures(page, [fakeMeasure({ easy: 3 })]);
     await seedBestDEP(page, 450);
     await page.goto('/app/app.html');
-    await page.waitForSelector('#dashboardContent .zone-badge');
-    await expect(page.locator('#dashboardContent')).toContainText('3');
+    await page.locator('[data-action="showCondition"][data-val="asthma"]').click();
+    await page.waitForSelector('#conditionDetail .zone-badge');
+    await expect(page.locator('#conditionDetail')).toContainText('3');
   });
 
 });
