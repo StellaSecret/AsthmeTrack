@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { seedMeasures, seedBestDEP, seedConditionEntries, goToTab, fakeMeasure, clearIDB } from './helpers';
 import path from 'path';
+import fs from 'fs';
 
 test.describe('Export PDF', () => {
 
@@ -57,6 +58,37 @@ test.describe('Export PDF', () => {
       modal.locator('[data-action="confirmExportPDF"]').click(),
     ]);
     expect(download.suggestedFilename()).toContain('.pdf');
+  });
+
+  test('le PDF contient les graphes asthme, tension et glycémie', async ({ page }) => {
+    await seedConditionEntries(page, [
+      { id: 'htn-1', conditionId: 'hypertension', type: 'measure', timestamp: '2025-01-17T08:00:00.000Z', data: { systolic: 120, diastolic: 80, pulse: 70 } },
+      { id: 'htn-2', conditionId: 'hypertension', type: 'measure', timestamp: '2025-01-18T08:00:00.000Z', data: { systolic: 135, diastolic: 88, pulse: 75 } },
+      { id: 'dm-1', conditionId: 'diabetes', type: 'measure', timestamp: '2025-01-17T07:00:00.000Z', data: { glucose: 110, unit: 'mg/dL', context: 'jeun' } },
+      { id: 'dm-2', conditionId: 'diabetes', type: 'measure', timestamp: '2025-01-18T07:00:00.000Z', data: { glucose: 140, unit: 'mg/dL', context: 'post' } },
+    ]);
+    await page.goto('/app/app.html');
+    await goToTab(page, 'historique');
+
+    await page.locator('.icon-btn[title="Exporter PDF"]').click();
+    const modal = page.locator('#pdfModal');
+    await expect(modal.locator('input[value="hypertension"]')).toBeEnabled();
+    await expect(modal.locator('input[value="diabetes"]')).toBeEnabled();
+
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      modal.locator('[data-action="confirmExportPDF"]').click(),
+    ]);
+    const filePath = await download.path();
+    expect(filePath).toBeTruthy();
+    const raw = fs.readFileSync(filePath!, 'latin1');
+
+    const pages = (raw.match(/\/Type\s*\/Page\b/g) || []).length;
+    const images = (raw.match(/\/Subtype\s*\/Image/g) || []).length;
+    expect(pages).toBeGreaterThanOrEqual(3);
+    expect(images).toBeGreaterThanOrEqual(4);
+    expect(raw).toContain('Tension art');
+    expect(raw).toContain('Glyc');
   });
 
   test('le bouton PDF dans les réglages déclenche un téléchargement', async ({ page }) => {
